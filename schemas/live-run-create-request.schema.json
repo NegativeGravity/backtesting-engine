@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "JsonValue": {}
+  },
+  "additionalProperties": false,
+  "properties": {
+    "end_time": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "End Time"
+    },
+    "max_close_batches": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Close Batches"
+    },
+    "name": {
+      "anyOf": [
+        {
+          "maxLength": 160,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Name"
+    },
+    "parameters": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Parameters",
+      "type": "object"
+    },
+    "run_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "speed_bars_per_second": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "maximum": 500.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "default": "10",
+      "title": "Speed Bars Per Second"
+    },
+    "start_paused": {
+      "default": true,
+      "title": "Start Paused",
+      "type": "boolean"
+    },
+    "start_time": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Start Time"
+    },
+    "strategy_package_id": {
+      "$ref": "#/$defs/Identifier"
+    }
+  },
+  "required": [
+    "strategy_package_id"
+  ],
+  "title": "LiveRunCreateRequest",
+  "type": "object"
+}

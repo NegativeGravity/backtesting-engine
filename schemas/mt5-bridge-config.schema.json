@@ -1,0 +1,118 @@
+{
+  "$defs": {
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "login": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Login"
+    },
+    "password_env": {
+      "default": "MT5_PASSWORD",
+      "title": "Password Env",
+      "type": "string"
+    },
+    "portable": {
+      "default": false,
+      "title": "Portable",
+      "type": "boolean"
+    },
+    "sample_distance_points": {
+      "default": 100,
+      "minimum": 0,
+      "title": "Sample Distance Points",
+      "type": "integer"
+    },
+    "sample_volumes": {
+      "default": [
+        "0.01",
+        "0.10",
+        "1.00"
+      ],
+      "items": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "type": "string"
+          }
+        ]
+      },
+      "title": "Sample Volumes",
+      "type": "array"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "server": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Server"
+    },
+    "snapshot_version": {
+      "default": "1.0.0",
+      "title": "Snapshot Version",
+      "type": "string"
+    },
+    "symbols": {
+      "items": {
+        "$ref": "#/$defs/SymbolCode"
+      },
+      "minItems": 1,
+      "title": "Symbols",
+      "type": "array"
+    },
+    "terminal_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Terminal Path"
+    },
+    "timeout_ms": {
+      "default": 60000,
+      "minimum": 0,
+      "title": "Timeout Ms",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "symbols"
+  ],
+  "title": "Mt5BridgeConfig",
+  "type": "object"
+}

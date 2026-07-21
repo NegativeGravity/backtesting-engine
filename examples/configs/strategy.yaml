@@ -1,0 +1,38 @@
+schema_version: 1.0.0
+strategy_id: daily_sweep
+name: Daily Sweep
+version: 1.0.0
+entrypoint: strategies.daily_sweep:DailySweepStrategy
+description: Multi-timeframe MT5 candle strategy example
+subscriptions:
+  - symbol: XAUUSD
+    timeframe: M1
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: M5
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: M15
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: H1
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: H4
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: D1
+    higher_timeframe_access: closed_only
+capabilities:
+  chart_drawings: true
+  custom_series: true
+  bar_events: true
+  quote_events: false
+  order_updates: true
+default_parameters:
+  risk_reward: 3
+  session: london_new_york
+tags:
+  - mt5
+  - multi_timeframe
+  - price_action

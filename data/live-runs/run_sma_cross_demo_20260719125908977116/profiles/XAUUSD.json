@@ -1,0 +1,28 @@
+{
+  "calculation_mode": "cfd",
+  "currency_base": "XAU",
+  "currency_margin": "USD",
+  "currency_profit": "USD",
+  "digits": 2,
+  "freeze_level_points": 0,
+  "margin_initial": "0",
+  "margin_maintenance": "0",
+  "metadata": {
+    "purpose": "development_example",
+    "verification_status": "replace_with_broker_snapshot"
+  },
+  "point": "0.01",
+  "profile_id": "mt5_xauusd_default",
+  "schema_version": "1.0.0",
+  "stops_level_points": 0,
+  "symbol": "XAUUSD",
+  "trade_contract_size": "100",
+  "trade_tick_size": "0.01",
+  "trade_tick_value": "1.00",
+  "trade_tick_value_loss": "1.00",
+  "trade_tick_value_profit": "1.00",
+  "version": "1.0.0",
+  "volume_max": "100",
+  "volume_min": "0.01",
+  "volume_step": "0.01"
+}

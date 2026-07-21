@@ -1,0 +1,63 @@
+{
+  "$defs": {
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "annualization_days": {
+      "default": 252,
+      "exclusiveMinimum": 0,
+      "title": "Annualization Days",
+      "type": "integer"
+    },
+    "confidence_level": {
+      "anyOf": [
+        {
+          "exclusiveMaximum": 1.0,
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "default": "0.95",
+      "title": "Confidence Level"
+    },
+    "minimum_annualization_days": {
+      "default": 30,
+      "exclusiveMinimum": 0,
+      "title": "Minimum Annualization Days",
+      "type": "integer"
+    },
+    "risk_free_rate_percent": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "default": "0",
+      "title": "Risk Free Rate Percent"
+    },
+    "rolling_window_days": {
+      "default": 30,
+      "exclusiveMinimum": 0,
+      "title": "Rolling Window Days",
+      "type": "integer"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    }
+  },
+  "title": "AnalyticsConfig",
+  "type": "object"
+}

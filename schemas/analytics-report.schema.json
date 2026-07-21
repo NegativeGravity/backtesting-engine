@@ -1,0 +1,1799 @@
+{
+  "$defs": {
+    "AnalyticsConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "annualization_days": {
+          "default": 252,
+          "exclusiveMinimum": 0,
+          "title": "Annualization Days",
+          "type": "integer"
+        },
+        "confidence_level": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1.0,
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0.95",
+          "title": "Confidence Level"
+        },
+        "minimum_annualization_days": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "Minimum Annualization Days",
+          "type": "integer"
+        },
+        "risk_free_rate_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Risk Free Rate Percent"
+        },
+        "rolling_window_days": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "title": "Rolling Window Days",
+          "type": "integer"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion",
+          "default": "1.0.0"
+        }
+      },
+      "title": "AnalyticsConfig",
+      "type": "object"
+    },
+    "BreakdownRow": {
+      "additionalProperties": false,
+      "properties": {
+        "average_holding_minutes": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Holding Minutes"
+        },
+        "average_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Pnl"
+        },
+        "average_r_multiple": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average R Multiple"
+        },
+        "key": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "label": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "losing_trades": {
+          "minimum": 0,
+          "title": "Losing Trades",
+          "type": "integer"
+        },
+        "net_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Net Pnl"
+        },
+        "profit_factor": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profit Factor"
+        },
+        "trade_count": {
+          "minimum": 0,
+          "title": "Trade Count",
+          "type": "integer"
+        },
+        "win_rate_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Win Rate Percent"
+        },
+        "winning_trades": {
+          "minimum": 0,
+          "title": "Winning Trades",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "trade_count",
+        "winning_trades",
+        "losing_trades",
+        "win_rate_percent",
+        "net_pnl",
+        "average_pnl",
+        "average_holding_minutes"
+      ],
+      "title": "BreakdownRow",
+      "type": "object"
+    },
+    "CurrencyCode": {
+      "maxLength": 8,
+      "minLength": 3,
+      "pattern": "^[A-Z0-9]+$",
+      "type": "string"
+    },
+    "DistributionBucket": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "label": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "lower_bound": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Lower Bound"
+        },
+        "percentage": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Percentage"
+        },
+        "upper_bound": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Upper Bound"
+        }
+      },
+      "required": [
+        "label",
+        "lower_bound",
+        "upper_bound",
+        "count",
+        "percentage"
+      ],
+      "title": "DistributionBucket",
+      "type": "object"
+    },
+    "DrawdownEpisode": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_minutes": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Duration Minutes"
+        },
+        "max_drawdown_amount": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Amount"
+        },
+        "max_drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Percent"
+        },
+        "recovery_minutes": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Minutes"
+        },
+        "recovery_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Time Ns"
+        },
+        "start_time_ns": {
+          "minimum": 0,
+          "title": "Start Time Ns",
+          "type": "integer"
+        },
+        "trough_time_ns": {
+          "minimum": 0,
+          "title": "Trough Time Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "start_time_ns",
+        "trough_time_ns",
+        "max_drawdown_amount",
+        "max_drawdown_percent",
+        "duration_minutes"
+      ],
+      "title": "DrawdownEpisode",
+      "type": "object"
+    },
+    "EquityCurvePoint": {
+      "additionalProperties": false,
+      "properties": {
+        "balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Balance"
+        },
+        "drawdown_amount": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown Amount"
+        },
+        "drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown Percent"
+        },
+        "equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Equity"
+        },
+        "floating_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Floating Pnl"
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin"
+        },
+        "time_ns": {
+          "minimum": 0,
+          "title": "Time Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "time_ns",
+        "balance",
+        "equity",
+        "floating_pnl",
+        "margin",
+        "drawdown_amount",
+        "drawdown_percent"
+      ],
+      "title": "EquityCurvePoint",
+      "type": "object"
+    },
+    "ExecutionCostMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "average_cost_per_trade": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Cost Per Trade"
+        },
+        "commission": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Commission"
+        },
+        "commission_share_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Commission Share Percent"
+        },
+        "cost_to_gross_profit_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cost To Gross Profit Percent"
+        },
+        "slippage_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Slippage Cost"
+        },
+        "slippage_share_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Slippage Share Percent"
+        },
+        "spread_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Spread Cost"
+        },
+        "spread_share_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Spread Share Percent"
+        },
+        "swap": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Swap"
+        },
+        "total_cost": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Total Cost"
+        }
+      },
+      "required": [
+        "commission",
+        "spread_cost",
+        "slippage_cost",
+        "swap",
+        "total_cost",
+        "average_cost_per_trade",
+        "commission_share_percent",
+        "spread_share_percent",
+        "slippage_share_percent"
+      ],
+      "title": "ExecutionCostMetrics",
+      "type": "object"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "PerformanceMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "average_loss": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average Loss"
+        },
+        "average_r_multiple": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average R Multiple"
+        },
+        "average_trade": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Trade"
+        },
+        "average_win": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average Win"
+        },
+        "best_trade": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Best Trade"
+        },
+        "cagr_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cagr Percent"
+        },
+        "expectancy": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Expectancy"
+        },
+        "final_balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Final Balance"
+        },
+        "final_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Final Equity"
+        },
+        "gross_loss": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Gross Loss"
+        },
+        "gross_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Gross Pnl"
+        },
+        "gross_profit": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Gross Profit"
+        },
+        "initial_balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Initial Balance"
+        },
+        "median_r_multiple": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Median R Multiple"
+        },
+        "median_trade": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Median Trade"
+        },
+        "net_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Net Pnl"
+        },
+        "payoff_ratio": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Payoff Ratio"
+        },
+        "profit_factor": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profit Factor"
+        },
+        "system_quality_number": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System Quality Number"
+        },
+        "total_return_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Total Return Percent"
+        },
+        "worst_trade": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Worst Trade"
+        }
+      },
+      "required": [
+        "initial_balance",
+        "final_balance",
+        "final_equity",
+        "gross_profit",
+        "gross_loss",
+        "gross_pnl",
+        "net_pnl",
+        "total_return_percent",
+        "expectancy",
+        "average_trade",
+        "median_trade"
+      ],
+      "title": "PerformanceMetrics",
+      "type": "object"
+    },
+    "PeriodReturnPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Equity"
+        },
+        "period": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Period",
+          "type": "string"
+        },
+        "pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Pnl"
+        },
+        "return_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Return Percent"
+        },
+        "time_ns": {
+          "minimum": 0,
+          "title": "Time Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "time_ns",
+        "period",
+        "equity",
+        "pnl",
+        "return_percent"
+      ],
+      "title": "PeriodReturnPoint",
+      "type": "object"
+    },
+    "PeriodicPerformance": {
+      "additionalProperties": false,
+      "properties": {
+        "closing_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Closing Equity"
+        },
+        "end_time_ns": {
+          "minimum": 0,
+          "title": "End Time Ns",
+          "type": "integer"
+        },
+        "losing_trades": {
+          "minimum": 0,
+          "title": "Losing Trades",
+          "type": "integer"
+        },
+        "max_drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Percent"
+        },
+        "net_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Net Pnl"
+        },
+        "opening_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Opening Equity"
+        },
+        "period": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "Period",
+          "type": "string"
+        },
+        "return_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Return Percent"
+        },
+        "start_time_ns": {
+          "minimum": 0,
+          "title": "Start Time Ns",
+          "type": "integer"
+        },
+        "trade_count": {
+          "minimum": 0,
+          "title": "Trade Count",
+          "type": "integer"
+        },
+        "win_rate_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Win Rate Percent"
+        },
+        "winning_trades": {
+          "minimum": 0,
+          "title": "Winning Trades",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "period",
+        "start_time_ns",
+        "end_time_ns",
+        "opening_equity",
+        "closing_equity",
+        "net_pnl",
+        "return_percent",
+        "max_drawdown_percent",
+        "trade_count",
+        "winning_trades",
+        "losing_trades",
+        "win_rate_percent"
+      ],
+      "title": "PeriodicPerformance",
+      "type": "object"
+    },
+    "RiskMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "annualized_volatility_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annualized Volatility Percent"
+        },
+        "average_drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Drawdown Percent"
+        },
+        "best_day_return_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Best Day Return Percent"
+        },
+        "calmar_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Calmar Ratio"
+        },
+        "conditional_value_at_risk_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Conditional Value At Risk Percent"
+        },
+        "max_drawdown_amount": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Amount"
+        },
+        "max_drawdown_duration_minutes": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Duration Minutes"
+        },
+        "max_drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Percent"
+        },
+        "max_recovery_duration_minutes": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Recovery Duration Minutes"
+        },
+        "recovery_factor": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recovery Factor"
+        },
+        "sharpe_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sharpe Ratio"
+        },
+        "sortino_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sortino Ratio"
+        },
+        "ulcer_index": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Ulcer Index"
+        },
+        "value_at_risk_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value At Risk Percent"
+        },
+        "worst_day_return_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Worst Day Return Percent"
+        }
+      },
+      "required": [
+        "max_drawdown_amount",
+        "max_drawdown_percent",
+        "max_drawdown_duration_minutes",
+        "average_drawdown_percent",
+        "ulcer_index"
+      ],
+      "title": "RiskMetrics",
+      "type": "object"
+    },
+    "RollingMetricPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "annualized_volatility_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Annualized Volatility Percent"
+        },
+        "rolling_drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rolling Drawdown Percent"
+        },
+        "sharpe_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sharpe Ratio"
+        },
+        "sortino_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sortino Ratio"
+        },
+        "time_ns": {
+          "minimum": 0,
+          "title": "Time Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "time_ns",
+        "rolling_drawdown_percent"
+      ],
+      "title": "RollingMetricPoint",
+      "type": "object"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "TradeBehaviorMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "ambiguous_trade_count": {
+          "minimum": 0,
+          "title": "Ambiguous Trade Count",
+          "type": "integer"
+        },
+        "average_holding_minutes": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Holding Minutes"
+        },
+        "average_mae": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Mae"
+        },
+        "average_mfe": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Mfe"
+        },
+        "average_mfe_capture_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average Mfe Capture Percent"
+        },
+        "breakeven_trades": {
+          "minimum": 0,
+          "title": "Breakeven Trades",
+          "type": "integer"
+        },
+        "long_trades": {
+          "minimum": 0,
+          "title": "Long Trades",
+          "type": "integer"
+        },
+        "longest_holding_minutes": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Longest Holding Minutes"
+        },
+        "losing_trades": {
+          "minimum": 0,
+          "title": "Losing Trades",
+          "type": "integer"
+        },
+        "loss_rate_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Loss Rate Percent"
+        },
+        "max_consecutive_losses": {
+          "minimum": 0,
+          "title": "Max Consecutive Losses",
+          "type": "integer"
+        },
+        "max_consecutive_wins": {
+          "minimum": 0,
+          "title": "Max Consecutive Wins",
+          "type": "integer"
+        },
+        "median_holding_minutes": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Median Holding Minutes"
+        },
+        "short_trades": {
+          "minimum": 0,
+          "title": "Short Trades",
+          "type": "integer"
+        },
+        "time_in_market_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Time In Market Percent"
+        },
+        "total_trades": {
+          "minimum": 0,
+          "title": "Total Trades",
+          "type": "integer"
+        },
+        "win_rate_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Win Rate Percent"
+        },
+        "winning_trades": {
+          "minimum": 0,
+          "title": "Winning Trades",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "total_trades",
+        "winning_trades",
+        "losing_trades",
+        "breakeven_trades",
+        "long_trades",
+        "short_trades",
+        "win_rate_percent",
+        "loss_rate_percent",
+        "average_holding_minutes",
+        "median_holding_minutes",
+        "longest_holding_minutes",
+        "max_consecutive_wins",
+        "max_consecutive_losses",
+        "time_in_market_percent",
+        "ambiguous_trade_count",
+        "average_mae",
+        "average_mfe"
+      ],
+      "title": "TradeBehaviorMetrics",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "config": {
+      "$ref": "#/$defs/AnalyticsConfig"
+    },
+    "costs": {
+      "$ref": "#/$defs/ExecutionCostMetrics"
+    },
+    "currency": {
+      "$ref": "#/$defs/CurrencyCode"
+    },
+    "daily_returns": {
+      "items": {
+        "$ref": "#/$defs/PeriodReturnPoint"
+      },
+      "title": "Daily Returns",
+      "type": "array"
+    },
+    "drawdown_episodes": {
+      "items": {
+        "$ref": "#/$defs/DrawdownEpisode"
+      },
+      "title": "Drawdown Episodes",
+      "type": "array"
+    },
+    "duration_distribution": {
+      "items": {
+        "$ref": "#/$defs/DistributionBucket"
+      },
+      "title": "Duration Distribution",
+      "type": "array"
+    },
+    "end_time_ns": {
+      "minimum": 0,
+      "title": "End Time Ns",
+      "type": "integer"
+    },
+    "equity_curve": {
+      "items": {
+        "$ref": "#/$defs/EquityCurvePoint"
+      },
+      "title": "Equity Curve",
+      "type": "array"
+    },
+    "exit_reason_breakdown": {
+      "items": {
+        "$ref": "#/$defs/BreakdownRow"
+      },
+      "title": "Exit Reason Breakdown",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "hour_breakdown": {
+      "items": {
+        "$ref": "#/$defs/BreakdownRow"
+      },
+      "title": "Hour Breakdown",
+      "type": "array"
+    },
+    "monthly_performance": {
+      "items": {
+        "$ref": "#/$defs/PeriodicPerformance"
+      },
+      "title": "Monthly Performance",
+      "type": "array"
+    },
+    "performance": {
+      "$ref": "#/$defs/PerformanceMetrics"
+    },
+    "pnl_distribution": {
+      "items": {
+        "$ref": "#/$defs/DistributionBucket"
+      },
+      "title": "Pnl Distribution",
+      "type": "array"
+    },
+    "r_multiple_distribution": {
+      "items": {
+        "$ref": "#/$defs/DistributionBucket"
+      },
+      "title": "R Multiple Distribution",
+      "type": "array"
+    },
+    "report_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "risk": {
+      "$ref": "#/$defs/RiskMetrics"
+    },
+    "rolling_metrics": {
+      "items": {
+        "$ref": "#/$defs/RollingMetricPoint"
+      },
+      "title": "Rolling Metrics",
+      "type": "array"
+    },
+    "run_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "side_breakdown": {
+      "items": {
+        "$ref": "#/$defs/BreakdownRow"
+      },
+      "title": "Side Breakdown",
+      "type": "array"
+    },
+    "start_time_ns": {
+      "minimum": 0,
+      "title": "Start Time Ns",
+      "type": "integer"
+    },
+    "symbol_breakdown": {
+      "items": {
+        "$ref": "#/$defs/BreakdownRow"
+      },
+      "title": "Symbol Breakdown",
+      "type": "array"
+    },
+    "trades": {
+      "$ref": "#/$defs/TradeBehaviorMetrics"
+    },
+    "weekday_breakdown": {
+      "items": {
+        "$ref": "#/$defs/BreakdownRow"
+      },
+      "title": "Weekday Breakdown",
+      "type": "array"
+    },
+    "yearly_performance": {
+      "items": {
+        "$ref": "#/$defs/PeriodicPerformance"
+      },
+      "title": "Yearly Performance",
+      "type": "array"
+    }
+  },
+  "required": [
+    "report_id",
+    "run_id",
+    "start_time_ns",
+    "end_time_ns",
+    "currency",
+    "config",
+    "performance",
+    "risk",
+    "trades",
+    "costs",
+    "equity_curve",
+    "daily_returns",
+    "rolling_metrics",
+    "monthly_performance",
+    "yearly_performance",
+    "drawdown_episodes",
+    "side_breakdown",
+    "symbol_breakdown",
+    "exit_reason_breakdown",
+    "weekday_breakdown",
+    "hour_breakdown",
+    "pnl_distribution",
+    "r_multiple_distribution",
+    "duration_distribution"
+  ],
+  "title": "AnalyticsReport",
+  "type": "object"
+}

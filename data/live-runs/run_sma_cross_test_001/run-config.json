@@ -1,0 +1,107 @@
+{
+  "account": {
+    "allow_negative_balance": false,
+    "currency": "USD",
+    "initial_balance": "100000",
+    "leverage": "100",
+    "margin_call_level_percent": "100",
+    "position_mode": "hedging",
+    "schema_version": "1.0.0",
+    "stop_out_level_percent": "50"
+  },
+  "dataset": {
+    "dataset_id": "xauusd_mt5_2025_2026",
+    "version": "2"
+  },
+  "end_time": "2026-07-13T13:22:00Z",
+  "execution": {
+    "allow_same_bar_exit_after_open_fill": true,
+    "commission": {
+      "amount_per_lot": "3.5",
+      "currency": "USD",
+      "mode": "per_lot_per_side"
+    },
+    "gap_policy": "marketable_open",
+    "intrabar_policy": "conservative",
+    "pending_order_activation_policy": "next_bar",
+    "schema_version": "1.0.0",
+    "signal_execution_policy": "next_bar_open",
+    "slippage": {
+      "limit_order_points": 0,
+      "market_order_points": 0,
+      "mode": "fixed",
+      "stop_order_points": 0
+    },
+    "spread": {
+      "mode": "fixed",
+      "points": 7
+    }
+  },
+  "execution_timeframe": "M1",
+  "metadata": {
+    "phase": "mt5_compatibility_demo"
+  },
+  "name": "XAUUSD SMA Cross Demo [run_sma_cross_test_001]",
+  "random_seed": 42,
+  "replay": {
+    "enabled": true,
+    "persist_account_snapshots": true,
+    "persist_chart_commands": true,
+    "snapshot_interval_events": 5000
+  },
+  "risk": {
+    "allow_long": true,
+    "allow_pyramiding": false,
+    "allow_short": true,
+    "default_sizing": {
+      "mode": "fixed_lot",
+      "volume_lots": "0.10"
+    },
+    "max_margin_usage_percent": "80",
+    "max_open_positions": 1,
+    "max_symbol_positions": 1,
+    "schema_version": "1.0.0"
+  },
+  "run_id": "run_sma_cross_test_001",
+  "schema_version": "1.0.0",
+  "start_time": "2025-01-02T01:05:00Z",
+  "strategy": {
+    "instance_id": "run_sma_cross_test_001.strategy",
+    "parameters": {
+      "allow_long": true,
+      "allow_short": true,
+      "fast_period": 10,
+      "reward_risk_ratio": "2",
+      "signal_timeframe": "M5",
+      "slow_period": 30,
+      "stop_distance_ticks": 800,
+      "symbol": "XAUUSD",
+      "volume_lots": "0.10"
+    },
+    "strategy_id": "sma_cross_demo",
+    "version": "1.0.0"
+  },
+  "subscriptions": [
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "XAUUSD",
+      "timeframe": "M1"
+    },
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "XAUUSD",
+      "timeframe": "M5"
+    },
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "XAUUSD",
+      "timeframe": "H1"
+    }
+  ],
+  "symbol_profiles": [
+    {
+      "profile_id": "mt5_xauusd_default",
+      "version": "1.0.0"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+import type { ReplayBar } from "../lib/types";
+import type { MaterializedChartState } from "./chartState";
+import type {
+  CapturedTimeViewport,
+  ChartViewportSettings,
+  PriceRange
+} from "./chartViewport";
+
+export interface ChartCoordinates {
+  timeToX(timeNs: number): number | null;
+  priceToY(price: number): number | null;
+}
+
+export interface ChartAdapter {
+  mount(container: HTMLElement): void;
+  destroy(): void;
+  setBars(bars: ReplayBar[]): void;
+  updateBars(bars: ReplayBar[]): void;
+  setStrategyState(state: MaterializedChartState, tickSize: number): void;
+  applyViewport(settings: ChartViewportSettings): void;
+  capturePriceRange(): PriceRange | null;
+  captureTimeViewport(): CapturedTimeViewport | null;
+  fitContent(): void;
+  coordinates(): ChartCoordinates;
+  subscribeRender(handler: () => void): () => void;
+}

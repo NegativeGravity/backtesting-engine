@@ -1,0 +1,10 @@
+schema_version: 1.0.0
+snapshot_path: examples/mt5/xauusd_offline_snapshot.json
+symbol_profile_paths:
+  - examples/configs/symbol_xauusd.yaml
+run_config_path: examples/configs/run_sma_cross.yaml
+tolerance:
+  money_absolute: "0.01"
+  money_relative_bps: "1"
+  decimal_absolute: "0.00000001"
+fail_on_warning: false

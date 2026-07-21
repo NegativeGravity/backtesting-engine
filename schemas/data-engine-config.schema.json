@@ -1,0 +1,174 @@
+{
+  "$defs": {
+    "CacheMode": {
+      "enum": [
+        "reuse",
+        "refresh",
+        "read_only"
+      ],
+      "title": "CacheMode",
+      "type": "string"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    },
+    "TrailingBarPolicy": {
+      "enum": [
+        "mark_incomplete",
+        "drop",
+        "reject"
+      ],
+      "title": "TrailingBarPolicy",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "as_of_time": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "As Of Time"
+    },
+    "audit_base_timeframe": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Timeframe"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "cache_mode": {
+      "$ref": "#/$defs/CacheMode",
+      "default": "reuse"
+    },
+    "cache_root": {
+      "default": "data/cache",
+      "title": "Cache Root",
+      "type": "string"
+    },
+    "compare_tick_volume": {
+      "default": true,
+      "title": "Compare Tick Volume",
+      "type": "boolean"
+    },
+    "cross_timeframe_audit": {
+      "default": true,
+      "title": "Cross Timeframe Audit",
+      "type": "boolean"
+    },
+    "csv_batch_rows": {
+      "default": 65536,
+      "exclusiveMinimum": 0,
+      "title": "Csv Batch Rows",
+      "type": "integer"
+    },
+    "csv_block_size_bytes": {
+      "default": 1048576,
+      "exclusiveMinimum": 0,
+      "title": "Csv Block Size Bytes",
+      "type": "integer"
+    },
+    "csv_use_threads": {
+      "default": false,
+      "title": "Csv Use Threads",
+      "type": "boolean"
+    },
+    "fail_on_warnings": {
+      "default": false,
+      "title": "Fail On Warnings",
+      "type": "boolean"
+    },
+    "max_issue_samples": {
+      "default": 100,
+      "exclusiveMinimum": 0,
+      "title": "Max Issue Samples",
+      "type": "integer"
+    },
+    "parquet_compression": {
+      "default": "zstd",
+      "enum": [
+        "zstd",
+        "snappy",
+        "lz4",
+        "uncompressed"
+      ],
+      "title": "Parquet Compression",
+      "type": "string"
+    },
+    "parquet_compression_level": {
+      "anyOf": [
+        {
+          "maximum": 22,
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": 6,
+      "title": "Parquet Compression Level"
+    },
+    "price_tolerance_ticks": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Price Tolerance Ticks",
+      "type": "integer"
+    },
+    "row_group_size": {
+      "default": 131072,
+      "exclusiveMinimum": 0,
+      "title": "Row Group Size",
+      "type": "integer"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "trailing_bar_policy": {
+      "$ref": "#/$defs/TrailingBarPolicy",
+      "default": "mark_incomplete"
+    }
+  },
+  "title": "DataEngineConfig",
+  "type": "object"
+}

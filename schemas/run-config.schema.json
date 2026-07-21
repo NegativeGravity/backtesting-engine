@@ -1,0 +1,866 @@
+{
+  "$defs": {
+    "AccountConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_negative_balance": {
+          "default": false,
+          "title": "Allow Negative Balance",
+          "type": "boolean"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode",
+          "default": "USD"
+        },
+        "initial_balance": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Initial Balance"
+        },
+        "leverage": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Leverage"
+        },
+        "margin_call_level_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "100",
+          "title": "Margin Call Level Percent"
+        },
+        "position_mode": {
+          "$ref": "#/$defs/PositionMode",
+          "default": "hedging"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion",
+          "default": "1.0.0"
+        },
+        "stop_out_level_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "50",
+          "title": "Stop Out Level Percent"
+        }
+      },
+      "required": [
+        "initial_balance",
+        "leverage"
+      ],
+      "title": "AccountConfig",
+      "type": "object"
+    },
+    "CommissionConfig": {
+      "discriminator": {
+        "mapping": {
+          "fixed_per_order": "#/$defs/FixedPerOrderCommissionConfig",
+          "none": "#/$defs/NoCommissionConfig",
+          "per_lot_per_side": "#/$defs/PerLotPerSideCommissionConfig",
+          "per_lot_round_turn": "#/$defs/PerLotRoundTurnCommissionConfig",
+          "percentage_of_notional": "#/$defs/PercentageOfNotionalCommissionConfig"
+        },
+        "propertyName": "mode"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/NoCommissionConfig"
+        },
+        {
+          "$ref": "#/$defs/FixedPerOrderCommissionConfig"
+        },
+        {
+          "$ref": "#/$defs/PerLotPerSideCommissionConfig"
+        },
+        {
+          "$ref": "#/$defs/PerLotRoundTurnCommissionConfig"
+        },
+        {
+          "$ref": "#/$defs/PercentageOfNotionalCommissionConfig"
+        }
+      ]
+    },
+    "CurrencyCode": {
+      "maxLength": 8,
+      "minLength": 3,
+      "pattern": "^[A-Z0-9]+$",
+      "type": "string"
+    },
+    "DatasetReference": {
+      "additionalProperties": false,
+      "properties": {
+        "content_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dataset_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "version": {
+          "maxLength": 64,
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dataset_id",
+        "version"
+      ],
+      "title": "DatasetReference",
+      "type": "object"
+    },
+    "ExecutionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_same_bar_exit_after_open_fill": {
+          "default": true,
+          "title": "Allow Same Bar Exit After Open Fill",
+          "type": "boolean"
+        },
+        "commission": {
+          "$ref": "#/$defs/CommissionConfig"
+        },
+        "gap_policy": {
+          "$ref": "#/$defs/GapPolicy",
+          "default": "marketable_open"
+        },
+        "intrabar_policy": {
+          "$ref": "#/$defs/IntrabarPolicy",
+          "default": "conservative"
+        },
+        "pending_order_activation_policy": {
+          "$ref": "#/$defs/PendingOrderActivationPolicy",
+          "default": "next_bar"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion",
+          "default": "1.0.0"
+        },
+        "signal_execution_policy": {
+          "$ref": "#/$defs/SignalExecutionPolicy",
+          "default": "next_bar_open"
+        },
+        "slippage": {
+          "$ref": "#/$defs/FixedSlippageConfig"
+        },
+        "spread": {
+          "$ref": "#/$defs/FixedSpreadConfig"
+        }
+      },
+      "required": [
+        "spread",
+        "commission"
+      ],
+      "title": "ExecutionConfig",
+      "type": "object"
+    },
+    "FixedCashRiskSizingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "cash_amount": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Cash Amount"
+        },
+        "mode": {
+          "const": "fixed_cash_risk",
+          "default": "fixed_cash_risk",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cash_amount"
+      ],
+      "title": "FixedCashRiskSizingConfig",
+      "type": "object"
+    },
+    "FixedLotSizingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "fixed_lot",
+          "default": "fixed_lot",
+          "title": "Mode",
+          "type": "string"
+        },
+        "volume_lots": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Lots"
+        }
+      },
+      "required": [
+        "volume_lots"
+      ],
+      "title": "FixedLotSizingConfig",
+      "type": "object"
+    },
+    "FixedPerOrderCommissionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Amount"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "mode": {
+          "const": "fixed_per_order",
+          "default": "fixed_per_order",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "title": "FixedPerOrderCommissionConfig",
+      "type": "object"
+    },
+    "FixedSlippageConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "limit_order_points": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Limit Order Points",
+          "type": "integer"
+        },
+        "market_order_points": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Market Order Points",
+          "type": "integer"
+        },
+        "mode": {
+          "const": "fixed",
+          "default": "fixed",
+          "title": "Mode",
+          "type": "string"
+        },
+        "stop_order_points": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Stop Order Points",
+          "type": "integer"
+        }
+      },
+      "title": "FixedSlippageConfig",
+      "type": "object"
+    },
+    "FixedSpreadConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "fixed",
+          "default": "fixed",
+          "title": "Mode",
+          "type": "string"
+        },
+        "points": {
+          "minimum": 0,
+          "title": "Points",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "points"
+      ],
+      "title": "FixedSpreadConfig",
+      "type": "object"
+    },
+    "GapPolicy": {
+      "enum": [
+        "marketable_open"
+      ],
+      "title": "GapPolicy",
+      "type": "string"
+    },
+    "HigherTimeframeAccess": {
+      "enum": [
+        "closed_only",
+        "forming_allowed"
+      ],
+      "title": "HigherTimeframeAccess",
+      "type": "string"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "IntrabarPolicy": {
+      "enum": [
+        "conservative",
+        "optimistic",
+        "nearest_to_open",
+        "stop_first",
+        "target_first",
+        "reject_ambiguous"
+      ],
+      "title": "IntrabarPolicy",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "NoCommissionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "none",
+          "default": "none",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "NoCommissionConfig",
+      "type": "object"
+    },
+    "PendingOrderActivationPolicy": {
+      "enum": [
+        "next_bar"
+      ],
+      "title": "PendingOrderActivationPolicy",
+      "type": "string"
+    },
+    "PerLotPerSideCommissionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "amount_per_lot": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Amount Per Lot"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "mode": {
+          "const": "per_lot_per_side",
+          "default": "per_lot_per_side",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount_per_lot",
+        "currency"
+      ],
+      "title": "PerLotPerSideCommissionConfig",
+      "type": "object"
+    },
+    "PerLotRoundTurnCommissionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "amount_per_lot": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Amount Per Lot"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "mode": {
+          "const": "per_lot_round_turn",
+          "default": "per_lot_round_turn",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount_per_lot",
+        "currency"
+      ],
+      "title": "PerLotRoundTurnCommissionConfig",
+      "type": "object"
+    },
+    "PercentageOfNotionalCommissionConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "percentage_of_notional",
+          "default": "percentage_of_notional",
+          "title": "Mode",
+          "type": "string"
+        },
+        "rate_bps": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Rate Bps"
+        }
+      },
+      "required": [
+        "rate_bps"
+      ],
+      "title": "PercentageOfNotionalCommissionConfig",
+      "type": "object"
+    },
+    "PositionMode": {
+      "enum": [
+        "netting",
+        "hedging"
+      ],
+      "title": "PositionMode",
+      "type": "string"
+    },
+    "PositionSizingConfig": {
+      "discriminator": {
+        "mapping": {
+          "fixed_cash_risk": "#/$defs/FixedCashRiskSizingConfig",
+          "fixed_lot": "#/$defs/FixedLotSizingConfig",
+          "risk_percent": "#/$defs/RiskPercentSizingConfig",
+          "strategy_defined": "#/$defs/StrategyDefinedSizingConfig"
+        },
+        "propertyName": "mode"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FixedLotSizingConfig"
+        },
+        {
+          "$ref": "#/$defs/RiskPercentSizingConfig"
+        },
+        {
+          "$ref": "#/$defs/FixedCashRiskSizingConfig"
+        },
+        {
+          "$ref": "#/$defs/StrategyDefinedSizingConfig"
+        }
+      ]
+    },
+    "ReplayRecordingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "persist_account_snapshots": {
+          "default": true,
+          "title": "Persist Account Snapshots",
+          "type": "boolean"
+        },
+        "persist_chart_commands": {
+          "default": true,
+          "title": "Persist Chart Commands",
+          "type": "boolean"
+        },
+        "snapshot_interval_events": {
+          "default": 5000,
+          "exclusiveMinimum": 0,
+          "title": "Snapshot Interval Events",
+          "type": "integer"
+        }
+      },
+      "title": "ReplayRecordingConfig",
+      "type": "object"
+    },
+    "RiskConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_long": {
+          "default": true,
+          "title": "Allow Long",
+          "type": "boolean"
+        },
+        "allow_pyramiding": {
+          "default": false,
+          "title": "Allow Pyramiding",
+          "type": "boolean"
+        },
+        "allow_short": {
+          "default": true,
+          "title": "Allow Short",
+          "type": "boolean"
+        },
+        "default_sizing": {
+          "$ref": "#/$defs/PositionSizingConfig"
+        },
+        "max_margin_usage_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 100.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "80",
+          "title": "Max Margin Usage Percent"
+        },
+        "max_open_positions": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Max Open Positions",
+          "type": "integer"
+        },
+        "max_symbol_positions": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Max Symbol Positions",
+          "type": "integer"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion",
+          "default": "1.0.0"
+        }
+      },
+      "required": [
+        "default_sizing"
+      ],
+      "title": "RiskConfig",
+      "type": "object"
+    },
+    "RiskPercentSizingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "risk_percent",
+          "default": "risk_percent",
+          "title": "Mode",
+          "type": "string"
+        },
+        "risk_percent": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 100.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Risk Percent"
+        }
+      },
+      "required": [
+        "risk_percent"
+      ],
+      "title": "RiskPercentSizingConfig",
+      "type": "object"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "SemanticVersion": {
+      "maxLength": 32,
+      "minLength": 5,
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+      "type": "string"
+    },
+    "Sha256Hex": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "SignalExecutionPolicy": {
+      "enum": [
+        "next_bar_open"
+      ],
+      "title": "SignalExecutionPolicy",
+      "type": "string"
+    },
+    "StrategyDefinedSizingConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "strategy_defined",
+          "default": "strategy_defined",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "StrategyDefinedSizingConfig",
+      "type": "object"
+    },
+    "StrategyInstanceConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "parameters": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Parameters",
+          "type": "object"
+        },
+        "strategy_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/SemanticVersion"
+        }
+      },
+      "required": [
+        "strategy_id",
+        "version",
+        "instance_id"
+      ],
+      "title": "StrategyInstanceConfig",
+      "type": "object"
+    },
+    "StrategySubscription": {
+      "additionalProperties": false,
+      "properties": {
+        "higher_timeframe_access": {
+          "$ref": "#/$defs/HigherTimeframeAccess",
+          "default": "closed_only"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        }
+      },
+      "required": [
+        "symbol",
+        "timeframe"
+      ],
+      "title": "StrategySubscription",
+      "type": "object"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "SymbolProfileReference": {
+      "additionalProperties": false,
+      "properties": {
+        "profile_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/SemanticVersion"
+        }
+      },
+      "required": [
+        "profile_id",
+        "version"
+      ],
+      "title": "SymbolProfileReference",
+      "type": "object"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "account": {
+      "$ref": "#/$defs/AccountConfig"
+    },
+    "dataset": {
+      "$ref": "#/$defs/DatasetReference"
+    },
+    "end_time": {
+      "format": "date-time",
+      "title": "End Time",
+      "type": "string"
+    },
+    "execution": {
+      "$ref": "#/$defs/ExecutionConfig"
+    },
+    "execution_timeframe": {
+      "$ref": "#/$defs/Timeframe"
+    },
+    "metadata": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Metadata",
+      "type": "object"
+    },
+    "name": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "random_seed": {
+      "default": 42,
+      "minimum": 0,
+      "title": "Random Seed",
+      "type": "integer"
+    },
+    "replay": {
+      "$ref": "#/$defs/ReplayRecordingConfig"
+    },
+    "risk": {
+      "$ref": "#/$defs/RiskConfig"
+    },
+    "run_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "start_time": {
+      "format": "date-time",
+      "title": "Start Time",
+      "type": "string"
+    },
+    "strategy": {
+      "$ref": "#/$defs/StrategyInstanceConfig"
+    },
+    "subscriptions": {
+      "items": {
+        "$ref": "#/$defs/StrategySubscription"
+      },
+      "minItems": 1,
+      "title": "Subscriptions",
+      "type": "array"
+    },
+    "symbol_profiles": {
+      "items": {
+        "$ref": "#/$defs/SymbolProfileReference"
+      },
+      "minItems": 1,
+      "title": "Symbol Profiles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "run_id",
+    "name",
+    "strategy",
+    "dataset",
+    "symbol_profiles",
+    "start_time",
+    "end_time",
+    "execution_timeframe",
+    "subscriptions",
+    "account",
+    "execution",
+    "risk"
+  ],
+  "title": "BacktestRunConfig",
+  "type": "object"
+}

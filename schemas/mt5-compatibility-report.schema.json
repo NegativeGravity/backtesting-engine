@@ -1,0 +1,216 @@
+{
+  "$defs": {
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "Mt5ValidationCheck": {
+      "additionalProperties": false,
+      "properties": {
+        "absolute_error": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Absolute Error"
+        },
+        "actual": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual"
+        },
+        "category": {
+          "enum": [
+            "terminal",
+            "account",
+            "symbol",
+            "profit",
+            "margin",
+            "mapping"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "check_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "relative_error_bps": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Relative Error Bps"
+        },
+        "sample_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "status": {
+          "enum": [
+            "passed",
+            "warning",
+            "failed",
+            "skipped"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "symbol": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SymbolCode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "check_id",
+        "category",
+        "status",
+        "message"
+      ],
+      "title": "Mt5ValidationCheck",
+      "type": "object"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "checks": {
+      "items": {
+        "$ref": "#/$defs/Mt5ValidationCheck"
+      },
+      "title": "Checks",
+      "type": "array"
+    },
+    "compatible": {
+      "title": "Compatible",
+      "type": "boolean"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "deterministic_digest": {
+      "title": "Deterministic Digest",
+      "type": "string"
+    },
+    "failed_checks": {
+      "minimum": 0,
+      "title": "Failed Checks",
+      "type": "integer"
+    },
+    "generated_profiles": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Generated Profiles",
+      "type": "array"
+    },
+    "passed_checks": {
+      "minimum": 0,
+      "title": "Passed Checks",
+      "type": "integer"
+    },
+    "report_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "skipped_checks": {
+      "minimum": 0,
+      "title": "Skipped Checks",
+      "type": "integer"
+    },
+    "snapshot_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "warning_checks": {
+      "minimum": 0,
+      "title": "Warning Checks",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "report_id",
+    "snapshot_id",
+    "compatible",
+    "passed_checks",
+    "warning_checks",
+    "failed_checks",
+    "skipped_checks",
+    "checks",
+    "generated_profiles",
+    "deterministic_digest"
+  ],
+  "title": "Mt5CompatibilityReport",
+  "type": "object"
+}

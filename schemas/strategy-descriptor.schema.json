@@ -1,0 +1,181 @@
+{
+  "$defs": {
+    "HigherTimeframeAccess": {
+      "enum": [
+        "closed_only",
+        "forming_allowed"
+      ],
+      "title": "HigherTimeframeAccess",
+      "type": "string"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "SemanticVersion": {
+      "maxLength": 32,
+      "minLength": 5,
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+      "type": "string"
+    },
+    "StrategyCapabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "bar_events": {
+          "default": true,
+          "title": "Bar Events",
+          "type": "boolean"
+        },
+        "chart_drawings": {
+          "default": true,
+          "title": "Chart Drawings",
+          "type": "boolean"
+        },
+        "custom_series": {
+          "default": true,
+          "title": "Custom Series",
+          "type": "boolean"
+        },
+        "order_updates": {
+          "default": true,
+          "title": "Order Updates",
+          "type": "boolean"
+        },
+        "quote_events": {
+          "default": false,
+          "title": "Quote Events",
+          "type": "boolean"
+        }
+      },
+      "title": "StrategyCapabilities",
+      "type": "object"
+    },
+    "StrategySubscription": {
+      "additionalProperties": false,
+      "properties": {
+        "higher_timeframe_access": {
+          "$ref": "#/$defs/HigherTimeframeAccess",
+          "default": "closed_only"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        }
+      },
+      "required": [
+        "symbol",
+        "timeframe"
+      ],
+      "title": "StrategySubscription",
+      "type": "object"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "$ref": "#/$defs/StrategyCapabilities"
+    },
+    "default_parameters": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Default Parameters",
+      "type": "object"
+    },
+    "description": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Description",
+      "type": "string"
+    },
+    "entrypoint": {
+      "maxLength": 256,
+      "minLength": 3,
+      "title": "Entrypoint",
+      "type": "string"
+    },
+    "name": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "strategy_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "subscriptions": {
+      "items": {
+        "$ref": "#/$defs/StrategySubscription"
+      },
+      "minItems": 1,
+      "title": "Subscriptions",
+      "type": "array"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "version": {
+      "$ref": "#/$defs/SemanticVersion"
+    }
+  },
+  "required": [
+    "strategy_id",
+    "name",
+    "version",
+    "entrypoint",
+    "subscriptions"
+  ],
+  "title": "StrategyDescriptor",
+  "type": "object"
+}

@@ -1,0 +1,481 @@
+{
+  "$defs": {
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "ReplayMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "average_r_multiple": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average R Multiple"
+        },
+        "commission": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Commission"
+        },
+        "final_balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Final Balance"
+        },
+        "final_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Final Equity"
+        },
+        "gross_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Gross Pnl"
+        },
+        "initial_balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Initial Balance"
+        },
+        "long_trades": {
+          "minimum": 0,
+          "title": "Long Trades",
+          "type": "integer"
+        },
+        "losing_trades": {
+          "minimum": 0,
+          "title": "Losing Trades",
+          "type": "integer"
+        },
+        "max_drawdown_amount": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Amount"
+        },
+        "max_drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Percent"
+        },
+        "net_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Net Pnl"
+        },
+        "profit_factor": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profit Factor"
+        },
+        "short_trades": {
+          "minimum": 0,
+          "title": "Short Trades",
+          "type": "integer"
+        },
+        "slippage_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Slippage Cost"
+        },
+        "spread_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Spread Cost"
+        },
+        "swap": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Swap"
+        },
+        "total_trades": {
+          "minimum": 0,
+          "title": "Total Trades",
+          "type": "integer"
+        },
+        "win_rate": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Win Rate"
+        },
+        "winning_trades": {
+          "minimum": 0,
+          "title": "Winning Trades",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "initial_balance",
+        "final_balance",
+        "final_equity",
+        "gross_pnl",
+        "net_pnl",
+        "commission",
+        "spread_cost",
+        "slippage_cost",
+        "swap",
+        "total_trades",
+        "winning_trades",
+        "losing_trades",
+        "long_trades",
+        "short_trades",
+        "win_rate",
+        "max_drawdown_amount",
+        "max_drawdown_percent"
+      ],
+      "title": "ReplayMetrics",
+      "type": "object"
+    },
+    "ReplayRunDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "available_symbols": {
+          "items": {
+            "$ref": "#/$defs/SymbolCode"
+          },
+          "title": "Available Symbols",
+          "type": "array"
+        },
+        "available_timeframes": {
+          "items": {
+            "$ref": "#/$defs/Timeframe"
+          },
+          "title": "Available Timeframes",
+          "type": "array"
+        },
+        "dataset_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "default_symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "default_timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "end_time_ns": {
+          "exclusiveMinimum": 0,
+          "title": "End Time Ns",
+          "type": "integer"
+        },
+        "execution_timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "metrics": {
+          "$ref": "#/$defs/ReplayMetrics"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "start_time_ns": {
+          "minimum": 0,
+          "title": "Start Time Ns",
+          "type": "integer"
+        },
+        "strategy_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "strategy_instance_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "run_id",
+        "name",
+        "strategy_id",
+        "strategy_instance_id",
+        "dataset_id",
+        "default_symbol",
+        "default_timeframe",
+        "execution_timeframe",
+        "available_symbols",
+        "available_timeframes",
+        "start_time_ns",
+        "end_time_ns",
+        "metrics"
+      ],
+      "title": "ReplayRunDescriptor",
+      "type": "object"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "current_time_ns": {
+      "minimum": 0,
+      "title": "Current Time Ns",
+      "type": "integer"
+    },
+    "descriptor": {
+      "$ref": "#/$defs/ReplayRunDescriptor"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "max_close_batches": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Close Batches"
+    },
+    "playing": {
+      "title": "Playing",
+      "type": "boolean"
+    },
+    "processed_close_batches": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Processed Close Batches",
+      "type": "integer"
+    },
+    "processed_execution_bars": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Processed Execution Bars",
+      "type": "integer"
+    },
+    "progress": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Progress"
+    },
+    "replay_ready": {
+      "default": false,
+      "title": "Replay Ready",
+      "type": "boolean"
+    },
+    "run_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "speed_bars_per_second": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Speed Bars Per Second"
+    },
+    "status": {
+      "enum": [
+        "created",
+        "starting",
+        "paused",
+        "running",
+        "rewinding",
+        "finalizing",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "strategy_package_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "updated_at": {
+      "format": "date-time",
+      "title": "Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "strategy_package_id",
+    "status",
+    "playing",
+    "speed_bars_per_second",
+    "current_time_ns",
+    "progress",
+    "created_at",
+    "updated_at",
+    "descriptor"
+  ],
+  "title": "LiveRunState",
+  "type": "object"
+}

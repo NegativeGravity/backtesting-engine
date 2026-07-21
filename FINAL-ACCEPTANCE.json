@@ -1,0 +1,126 @@
+{
+  "release": "1.2.0",
+  "name": "Dashboard Pro Performance Workstation",
+  "created_at": "2026-07-19T14:50:00Z",
+  "target_platform": "Windows 10/11, Python 3.12, Node.js 22, Docker Desktop",
+  "focus": "high-performance candle replay, persistent chart viewport, professional dashboard ergonomics",
+  "quality": {
+    "ruff_lint": "passed",
+    "ruff_format": "passed",
+    "pyright_strict": {
+      "status": "passed",
+      "errors": 0,
+      "warnings": 0
+    },
+    "python_tests": {
+      "status": "passed",
+      "passed": 124,
+      "duration_seconds": 16.32,
+      "build_environment_python": "3.13",
+      "project_target_python": "3.12"
+    },
+    "frontend": {
+      "typescript": "passed",
+      "test_files": 6,
+      "tests_passed": 18,
+      "production_build": "passed",
+      "javascript_bytes": 441403,
+      "javascript_gzip_bytes": 135445,
+      "css_bytes": 37888,
+      "css_gzip_bytes": 8014
+    },
+    "schema_drift": "passed",
+    "contract_examples": {
+      "status": "passed",
+      "validated": 15
+    },
+    "application_smoke": "passed",
+    "live_engine_smoke": {
+      "status": "passed",
+      "manual_step_cursor_sequence": 1,
+      "rewind_cursor_sequence": 0,
+      "processed_close_batches": 50,
+      "replay_ready": true
+    }
+  },
+  "dashboard": {
+    "render_profiles": [
+      "smooth",
+      "balanced",
+      "throughput"
+    ],
+    "timeframes": [
+      "M1",
+      "M5",
+      "M15",
+      "H1",
+      "H4",
+      "D1"
+    ],
+    "layouts": [
+      "focus",
+      "balanced",
+      "analysis"
+    ],
+    "persistent_viewport": "per symbol and timeframe",
+    "horizontal_scale_lock": true,
+    "vertical_scale_lock": true,
+    "resizable_inspector": true,
+    "resizable_bottom_dock": true,
+    "keyboard_shortcuts": true,
+    "diagnostics": "opt-in",
+    "retained_candle_window": 12000,
+    "retained_indicator_points_per_series": 12000,
+    "retained_event_window": 5000,
+    "analytics_equity_render_limit": 1400,
+    "analytics_drawdown_render_limit": 900
+  },
+  "performance_changes": [
+    "Adaptive WebSocket frame scheduling based on replay speed and tab visibility",
+    "Multiple transport frames merged into one React state transition",
+    "Incremental candle updates instead of full series replacement",
+    "Incremental strategy indicator updates with bounded point retention",
+    "Fast ordered append path for replay bars",
+    "Sequence-based deduplication and safe overlap handling",
+    "Periodic chart compaction instead of per-frame rebuilding",
+    "Memoized high-frequency dashboard boundaries and stable callbacks",
+    "requestAnimationFrame-throttled panel resizing",
+    "Extrema-preserving downsampling for large analytics curves",
+    "Iterative finite extent calculation without large-array argument spreading",
+    "Content visibility and bounded table windows for lower layout cost"
+  ],
+  "resolved_issues": [
+    "Chart lag during high-speed replay",
+    "Visible data disappearing after browser retention was reached",
+    "Viewport scale drifting or resetting during replay",
+    "Chart workspace being too small",
+    "Unbounded analytics SVG paths on long runs",
+    "Excessive React dispatch frequency",
+    "Windows PipeConnection strict type incompatibility",
+    "Schema drift previously reported by the Windows quality gate"
+  ],
+  "determinism": {
+    "strategy_digest": "2b617ebf072cd92f5f9b030a5baef938a4c7709ae842c5842d2ab839f97cc748",
+    "strategy_source_sha256": "a5c013ed411d9e0f128e92681648eca75b043320a6b4ea21ff2792bfe2d04872",
+    "replay_database_sha256": "e764c92ecdead479e2fe26110a93838847a66d394d7fa9110d7796584c7c1308",
+    "analytics_sha256": "7f799ab464924b42440508a0422bad1605573c9ba379077d5dd76ffbe8a6451e"
+  },
+  "limitations": [
+    "The simulator remains OHLC candle-level and cannot reconstruct historical intrabar tick order.",
+    "Docker Engine was not available inside the artifact build container, so final Docker runtime execution must be repeated on Docker Desktop.",
+    "Actual frame rate depends on browser, GPU acceleration, display refresh rate, strategy drawing volume, and replay speed."
+  ],
+  "archive_validation": {
+    "full_zip_crc": "passed",
+    "source_zip_crc": "passed",
+    "hotfix_zip_crc": "passed",
+    "source_zip_ruff": "passed",
+    "source_zip_pyright": "0 errors, 0 warnings",
+    "source_zip_python_tests": "124 passed in 16.13 seconds",
+    "source_zip_schema_drift": "passed",
+    "source_zip_frontend_tests": "18 passed",
+    "source_zip_typescript": "passed",
+    "source_zip_production_build": "passed",
+    "private_registry_scan": "passed"
+  }
+}

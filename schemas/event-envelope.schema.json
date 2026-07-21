@@ -1,0 +1,139 @@
+{
+  "$defs": {
+    "EventType": {
+      "enum": [
+        "run.created",
+        "run.started",
+        "run.progress",
+        "run.completed",
+        "run.failed",
+        "market.bar_opened",
+        "market.bar_closed",
+        "order.created",
+        "order.accepted",
+        "order.activated",
+        "order.partially_filled",
+        "order.filled",
+        "order.cancelled",
+        "order.modified",
+        "order.rejected",
+        "order.expired",
+        "position.opened",
+        "position.updated",
+        "position.closed",
+        "position.liquidated",
+        "account.updated",
+        "account.margin_call",
+        "account.stop_out",
+        "chart.command"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "causation_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "correlation_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "emitted_at": {
+      "format": "date-time",
+      "title": "Emitted At",
+      "type": "string"
+    },
+    "event_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "event_time_ns": {
+      "minimum": 0,
+      "title": "Event Time Ns",
+      "type": "integer"
+    },
+    "event_type": {
+      "$ref": "#/$defs/EventType"
+    },
+    "payload": {
+      "additionalProperties": true,
+      "title": "Payload",
+      "type": "object"
+    },
+    "run_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "sequence": {
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "strategy_instance_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "symbol": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "run_id",
+    "sequence",
+    "event_type",
+    "event_time_ns",
+    "payload"
+  ],
+  "title": "EventEnvelope[dict[str, Any]]",
+  "type": "object"
+}

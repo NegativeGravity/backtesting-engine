@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "OrderType": {
+      "enum": [
+        "market",
+        "limit",
+        "stop"
+      ],
+      "title": "OrderType",
+      "type": "string"
+    },
+    "Side": {
+      "enum": [
+        "buy",
+        "sell"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "TimeInForce": {
+      "enum": [
+        "gtc",
+        "day"
+      ],
+      "title": "TimeInForce",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "client_order_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "created_time_ns": {
+      "minimum": 0,
+      "title": "Created Time Ns",
+      "type": "integer"
+    },
+    "expiration_time_ns": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expiration Time Ns"
+    },
+    "order_type": {
+      "$ref": "#/$defs/OrderType"
+    },
+    "position_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Identifier"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "price_ticks": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Price Ticks"
+    },
+    "reduce_only": {
+      "default": false,
+      "title": "Reduce Only",
+      "type": "boolean"
+    },
+    "run_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "side": {
+      "$ref": "#/$defs/Side"
+    },
+    "stop_loss_ticks": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stop Loss Ticks"
+    },
+    "strategy_instance_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "symbol": {
+      "$ref": "#/$defs/SymbolCode"
+    },
+    "tags": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "object"
+    },
+    "take_profit_ticks": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Take Profit Ticks"
+    },
+    "time_in_force": {
+      "$ref": "#/$defs/TimeInForce",
+      "default": "gtc"
+    },
+    "volume_lots": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Volume Lots"
+    }
+  },
+  "required": [
+    "client_order_id",
+    "run_id",
+    "strategy_instance_id",
+    "symbol",
+    "side",
+    "order_type",
+    "volume_lots",
+    "created_time_ns"
+  ],
+  "title": "OrderRequest",
+  "type": "object"
+}

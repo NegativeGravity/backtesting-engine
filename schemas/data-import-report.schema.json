@@ -1,0 +1,553 @@
+{
+  "$defs": {
+    "CacheArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "cache_key": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "complete_row_count": {
+          "minimum": 0,
+          "title": "Complete Row Count",
+          "type": "integer"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "incomplete_row_count": {
+          "minimum": 0,
+          "title": "Incomplete Row Count",
+          "type": "integer"
+        },
+        "relative_path": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "reused": {
+          "default": false,
+          "title": "Reused",
+          "type": "boolean"
+        },
+        "row_count": {
+          "minimum": 0,
+          "title": "Row Count",
+          "type": "integer"
+        },
+        "size_bytes": {
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        },
+        "source_sha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        }
+      },
+      "required": [
+        "symbol",
+        "timeframe",
+        "relative_path",
+        "row_count",
+        "complete_row_count",
+        "incomplete_row_count",
+        "content_sha256",
+        "source_sha256",
+        "cache_key",
+        "size_bytes"
+      ],
+      "title": "CacheArtifact",
+      "type": "object"
+    },
+    "CrossTimeframeMismatch": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregated_values": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Aggregated Values",
+          "type": "object"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        },
+        "open_time_ns": {
+          "minimum": 0,
+          "title": "Open Time Ns",
+          "type": "integer"
+        },
+        "source_values": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Source Values",
+          "type": "object"
+        }
+      },
+      "required": [
+        "open_time_ns",
+        "fields",
+        "source_values",
+        "aggregated_values"
+      ],
+      "title": "CrossTimeframeMismatch",
+      "type": "object"
+    },
+    "CrossTimeframeReport": {
+      "additionalProperties": false,
+      "properties": {
+        "aggregate_only_bar_count": {
+          "minimum": 0,
+          "title": "Aggregate Only Bar Count",
+          "type": "integer"
+        },
+        "base_timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "compared_bar_count": {
+          "minimum": 0,
+          "title": "Compared Bar Count",
+          "type": "integer"
+        },
+        "matching_bar_count": {
+          "minimum": 0,
+          "title": "Matching Bar Count",
+          "type": "integer"
+        },
+        "mismatch_samples": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CrossTimeframeMismatch"
+          },
+          "title": "Mismatch Samples",
+          "type": "array"
+        },
+        "mismatching_bar_count": {
+          "minimum": 0,
+          "title": "Mismatching Bar Count",
+          "type": "integer"
+        },
+        "source_only_bar_count": {
+          "minimum": 0,
+          "title": "Source Only Bar Count",
+          "type": "integer"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "target_timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        }
+      },
+      "required": [
+        "symbol",
+        "base_timeframe",
+        "target_timeframe",
+        "compared_bar_count",
+        "matching_bar_count",
+        "mismatching_bar_count",
+        "source_only_bar_count",
+        "aggregate_only_bar_count"
+      ],
+      "title": "CrossTimeframeReport",
+      "type": "object"
+    },
+    "DataFileReport": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_end": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual End"
+        },
+        "actual_start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual Start"
+        },
+        "artifact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CacheArtifact"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "complete_row_count": {
+          "minimum": 0,
+          "title": "Complete Row Count",
+          "type": "integer"
+        },
+        "delimiter": {
+          "maxLength": 2,
+          "minLength": 1,
+          "title": "Delimiter",
+          "type": "string"
+        },
+        "duplicate_timestamp_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Duplicate Timestamp Count",
+          "type": "integer"
+        },
+        "error_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Error Count",
+          "type": "integer"
+        },
+        "estimated_missing_bars": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Estimated Missing Bars",
+          "type": "integer"
+        },
+        "gap_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Gap Count",
+          "type": "integer"
+        },
+        "incomplete_row_count": {
+          "minimum": 0,
+          "title": "Incomplete Row Count",
+          "type": "integer"
+        },
+        "issue_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Issue Count",
+          "type": "integer"
+        },
+        "issues": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DataQualityIssue"
+          },
+          "title": "Issues",
+          "type": "array"
+        },
+        "maximum_gap_seconds": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Maximum Gap Seconds",
+          "type": "integer"
+        },
+        "out_of_order_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Out Of Order Count",
+          "type": "integer"
+        },
+        "output_row_count": {
+          "minimum": 0,
+          "title": "Output Row Count",
+          "type": "integer"
+        },
+        "source_path": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Source Path",
+          "type": "string"
+        },
+        "source_row_count": {
+          "minimum": 0,
+          "title": "Source Row Count",
+          "type": "integer"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "warning_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "symbol",
+        "timeframe",
+        "source_path",
+        "delimiter",
+        "source_row_count",
+        "output_row_count",
+        "complete_row_count",
+        "incomplete_row_count"
+      ],
+      "title": "DataFileReport",
+      "type": "object"
+    },
+    "DataIssueSeverity": {
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ],
+      "title": "DataIssueSeverity",
+      "type": "string"
+    },
+    "DataQualityIssue": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "maxLength": 80,
+          "minLength": 3,
+          "pattern": "^[A-Z][A-Z0-9_]+$",
+          "title": "Code",
+          "type": "string"
+        },
+        "details": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Details",
+          "type": "object"
+        },
+        "message": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "open_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Open Time Ns"
+        },
+        "row_number": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Number"
+        },
+        "severity": {
+          "$ref": "#/$defs/DataIssueSeverity"
+        }
+      },
+      "required": [
+        "severity",
+        "code",
+        "message"
+      ],
+      "title": "DataQualityIssue",
+      "type": "object"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "Sha256Hex": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "complete_row_count": {
+      "minimum": 0,
+      "title": "Complete Row Count",
+      "type": "integer"
+    },
+    "completion_watermark": {
+      "format": "date-time",
+      "title": "Completion Watermark",
+      "type": "string"
+    },
+    "config_fingerprint": {
+      "$ref": "#/$defs/Sha256Hex"
+    },
+    "cross_timeframe_reports": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CrossTimeframeReport"
+      },
+      "title": "Cross Timeframe Reports",
+      "type": "array"
+    },
+    "dataset_fingerprint": {
+      "$ref": "#/$defs/Sha256Hex"
+    },
+    "dataset_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "dataset_version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Dataset Version",
+      "type": "string"
+    },
+    "error_count": {
+      "minimum": 0,
+      "title": "Error Count",
+      "type": "integer"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/DataFileReport"
+      },
+      "title": "Files",
+      "type": "array"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "incomplete_row_count": {
+      "minimum": 0,
+      "title": "Incomplete Row Count",
+      "type": "integer"
+    },
+    "output_row_count": {
+      "minimum": 0,
+      "title": "Output Row Count",
+      "type": "integer"
+    },
+    "report_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "source_row_count": {
+      "minimum": 0,
+      "title": "Source Row Count",
+      "type": "integer"
+    },
+    "success": {
+      "title": "Success",
+      "type": "boolean"
+    },
+    "warning_count": {
+      "minimum": 0,
+      "title": "Warning Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "report_id",
+    "dataset_id",
+    "dataset_version",
+    "dataset_fingerprint",
+    "config_fingerprint",
+    "completion_watermark",
+    "success",
+    "source_row_count",
+    "output_row_count",
+    "complete_row_count",
+    "incomplete_row_count",
+    "warning_count",
+    "error_count",
+    "files"
+  ],
+  "title": "DataImportReport",
+  "type": "object"
+}

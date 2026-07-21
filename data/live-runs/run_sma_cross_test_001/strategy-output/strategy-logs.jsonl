@@ -1,0 +1,2 @@
+{"fields":{"fast_period":10,"slow_period":30,"symbol":"XAUUSD","timeframe":"M5"},"level":"info","message":"sma_cross_started","sequence":1,"time_ns":1735779900000000000}
+{"fields":{"reason":"cancelled"},"level":"info","message":"sma_cross_stopped","sequence":2,"time_ns":1735779960000000000}

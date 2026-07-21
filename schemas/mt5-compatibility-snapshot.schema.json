@@ -1,0 +1,826 @@
+{
+  "$defs": {
+    "CurrencyCode": {
+      "maxLength": 8,
+      "minLength": 3,
+      "pattern": "^[A-Z0-9]+$",
+      "type": "string"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "Mt5AccountSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Balance"
+        },
+        "company": {
+          "title": "Company",
+          "type": "string"
+        },
+        "credit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Credit"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Equity"
+        },
+        "leverage": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Leverage"
+        },
+        "login": {
+          "minimum": 0,
+          "title": "Login",
+          "type": "integer"
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin"
+        },
+        "margin_free": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin Free"
+        },
+        "margin_level": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Margin Level"
+        },
+        "margin_so_call": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin So Call"
+        },
+        "margin_so_mode": {
+          "minimum": 0,
+          "title": "Margin So Mode",
+          "type": "integer"
+        },
+        "margin_so_so": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin So So"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "position_mode": {
+          "$ref": "#/$defs/PositionMode"
+        },
+        "profit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Profit"
+        },
+        "server": {
+          "title": "Server",
+          "type": "string"
+        },
+        "trade_allowed": {
+          "title": "Trade Allowed",
+          "type": "boolean"
+        },
+        "trade_expert": {
+          "title": "Trade Expert",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "login",
+        "server",
+        "company",
+        "name",
+        "currency",
+        "leverage",
+        "position_mode",
+        "trade_allowed",
+        "trade_expert",
+        "balance",
+        "credit",
+        "profit",
+        "equity",
+        "margin",
+        "margin_free",
+        "margin_so_mode",
+        "margin_so_call",
+        "margin_so_so"
+      ],
+      "title": "Mt5AccountSnapshot",
+      "type": "object"
+    },
+    "Mt5CalculationSample": {
+      "additionalProperties": false,
+      "properties": {
+        "close_price": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Close Price"
+        },
+        "mt5_margin": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Mt5 Margin"
+        },
+        "mt5_profit": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Mt5 Profit"
+        },
+        "open_price": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Open Price"
+        },
+        "sample_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "side": {
+          "$ref": "#/$defs/Side"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "volume_lots": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Lots"
+        }
+      },
+      "required": [
+        "sample_id",
+        "symbol",
+        "side",
+        "volume_lots",
+        "open_price",
+        "close_price",
+        "mt5_profit",
+        "mt5_margin"
+      ],
+      "title": "Mt5CalculationSample",
+      "type": "object"
+    },
+    "Mt5SymbolSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "ask": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Ask"
+        },
+        "bid": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Bid"
+        },
+        "currency_base": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "currency_margin": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "currency_profit": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "digits": {
+          "maximum": 12,
+          "minimum": 0,
+          "title": "Digits",
+          "type": "integer"
+        },
+        "expiration_mode": {
+          "minimum": 0,
+          "title": "Expiration Mode",
+          "type": "integer"
+        },
+        "filling_mode": {
+          "minimum": 0,
+          "title": "Filling Mode",
+          "type": "integer"
+        },
+        "freeze_level_points": {
+          "minimum": 0,
+          "title": "Freeze Level Points",
+          "type": "integer"
+        },
+        "last": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Last"
+        },
+        "margin_hedged": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin Hedged"
+        },
+        "margin_hedged_use_leg": {
+          "title": "Margin Hedged Use Leg",
+          "type": "boolean"
+        },
+        "margin_initial": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin Initial"
+        },
+        "margin_maintenance": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin Maintenance"
+        },
+        "order_mode": {
+          "minimum": 0,
+          "title": "Order Mode",
+          "type": "integer"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "point": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Point"
+        },
+        "spread_float": {
+          "title": "Spread Float",
+          "type": "boolean"
+        },
+        "spread_points": {
+          "minimum": 0,
+          "title": "Spread Points",
+          "type": "integer"
+        },
+        "stops_level_points": {
+          "minimum": 0,
+          "title": "Stops Level Points",
+          "type": "integer"
+        },
+        "swap_long": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Swap Long"
+        },
+        "swap_mode": {
+          "minimum": 0,
+          "title": "Swap Mode",
+          "type": "integer"
+        },
+        "swap_short": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Swap Short"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "time_msc": {
+          "minimum": 0,
+          "title": "Time Msc",
+          "type": "integer"
+        },
+        "trade_calc_mode": {
+          "minimum": 0,
+          "title": "Trade Calc Mode",
+          "type": "integer"
+        },
+        "trade_contract_size": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Trade Contract Size"
+        },
+        "trade_execution_mode": {
+          "minimum": 0,
+          "title": "Trade Execution Mode",
+          "type": "integer"
+        },
+        "trade_mode": {
+          "minimum": 0,
+          "title": "Trade Mode",
+          "type": "integer"
+        },
+        "trade_tick_size": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Trade Tick Size"
+        },
+        "trade_tick_value": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Trade Tick Value"
+        },
+        "trade_tick_value_loss": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Trade Tick Value Loss"
+        },
+        "trade_tick_value_profit": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Trade Tick Value Profit"
+        },
+        "volume_limit": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Limit"
+        },
+        "volume_max": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Max"
+        },
+        "volume_min": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Min"
+        },
+        "volume_step": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Step"
+        }
+      },
+      "required": [
+        "symbol",
+        "path",
+        "description",
+        "currency_base",
+        "currency_profit",
+        "currency_margin",
+        "digits",
+        "point",
+        "spread_points",
+        "spread_float",
+        "trade_calc_mode",
+        "trade_mode",
+        "trade_execution_mode",
+        "order_mode",
+        "filling_mode",
+        "expiration_mode",
+        "stops_level_points",
+        "freeze_level_points",
+        "trade_tick_size",
+        "trade_tick_value",
+        "trade_tick_value_profit",
+        "trade_tick_value_loss",
+        "trade_contract_size",
+        "volume_min",
+        "volume_max",
+        "volume_step",
+        "volume_limit",
+        "margin_initial",
+        "margin_maintenance",
+        "margin_hedged",
+        "margin_hedged_use_leg",
+        "swap_mode",
+        "swap_long",
+        "swap_short",
+        "bid",
+        "ask",
+        "last",
+        "time_msc"
+      ],
+      "title": "Mt5SymbolSnapshot",
+      "type": "object"
+    },
+    "Mt5TerminalSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "build": {
+          "minimum": 0,
+          "title": "Build",
+          "type": "integer"
+        },
+        "commondata_path": {
+          "title": "Commondata Path",
+          "type": "string"
+        },
+        "company": {
+          "title": "Company",
+          "type": "string"
+        },
+        "connected": {
+          "title": "Connected",
+          "type": "boolean"
+        },
+        "data_path": {
+          "title": "Data Path",
+          "type": "string"
+        },
+        "maxbars": {
+          "minimum": 0,
+          "title": "Maxbars",
+          "type": "integer"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "ping_last_us": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ping Last Us"
+        },
+        "trade_allowed": {
+          "title": "Trade Allowed",
+          "type": "boolean"
+        },
+        "tradeapi_disabled": {
+          "title": "Tradeapi Disabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "company",
+        "build",
+        "connected",
+        "trade_allowed",
+        "tradeapi_disabled",
+        "path",
+        "data_path",
+        "commondata_path",
+        "maxbars"
+      ],
+      "title": "Mt5TerminalSnapshot",
+      "type": "object"
+    },
+    "PositionMode": {
+      "enum": [
+        "netting",
+        "hedging"
+      ],
+      "title": "PositionMode",
+      "type": "string"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "SemanticVersion": {
+      "maxLength": 32,
+      "minLength": 5,
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$",
+      "type": "string"
+    },
+    "Side": {
+      "enum": [
+        "buy",
+        "sell"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "account": {
+      "$ref": "#/$defs/Mt5AccountSnapshot"
+    },
+    "calculation_samples": {
+      "items": {
+        "$ref": "#/$defs/Mt5CalculationSample"
+      },
+      "title": "Calculation Samples",
+      "type": "array"
+    },
+    "captured_at": {
+      "format": "date-time",
+      "title": "Captured At",
+      "type": "string"
+    },
+    "metadata": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Metadata",
+      "type": "object"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "snapshot_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "symbols": {
+      "items": {
+        "$ref": "#/$defs/Mt5SymbolSnapshot"
+      },
+      "minItems": 1,
+      "title": "Symbols",
+      "type": "array"
+    },
+    "terminal": {
+      "$ref": "#/$defs/Mt5TerminalSnapshot"
+    },
+    "version": {
+      "$ref": "#/$defs/SemanticVersion"
+    }
+  },
+  "required": [
+    "snapshot_id",
+    "version",
+    "terminal",
+    "account",
+    "symbols"
+  ],
+  "title": "Mt5CompatibilitySnapshot",
+  "type": "object"
+}

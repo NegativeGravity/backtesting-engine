@@ -1,0 +1,1930 @@
+{
+  "$defs": {
+    "AccountSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Balance"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "drawdown_amount": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown Amount"
+        },
+        "drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown Percent"
+        },
+        "equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Equity"
+        },
+        "floating_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Floating Pnl"
+        },
+        "free_margin": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Free Margin"
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin"
+        },
+        "margin_level_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Margin Level Percent"
+        },
+        "peak_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Peak Equity"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp_ns": {
+          "minimum": 0,
+          "title": "Timestamp Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "timestamp_ns",
+        "sequence",
+        "currency",
+        "balance",
+        "equity",
+        "margin",
+        "free_margin",
+        "floating_pnl",
+        "peak_equity",
+        "drawdown_amount",
+        "drawdown_percent"
+      ],
+      "title": "AccountSnapshot",
+      "type": "object"
+    },
+    "BrokerSimulationReport": {
+      "additionalProperties": false,
+      "properties": {
+        "cancelled_order_count": {
+          "minimum": 0,
+          "title": "Cancelled Order Count",
+          "type": "integer"
+        },
+        "commission": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Commission"
+        },
+        "deterministic_digest": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "event_count": {
+          "minimum": 0,
+          "title": "Event Count",
+          "type": "integer"
+        },
+        "fill_count": {
+          "minimum": 0,
+          "title": "Fill Count",
+          "type": "integer"
+        },
+        "final_account": {
+          "$ref": "#/$defs/AccountSnapshot"
+        },
+        "gross_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Gross Pnl"
+        },
+        "net_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Net Pnl"
+        },
+        "open_position_count": {
+          "minimum": 0,
+          "title": "Open Position Count",
+          "type": "integer"
+        },
+        "order_count": {
+          "minimum": 0,
+          "title": "Order Count",
+          "type": "integer"
+        },
+        "processed_bars": {
+          "minimum": 0,
+          "title": "Processed Bars",
+          "type": "integer"
+        },
+        "rejected_order_count": {
+          "minimum": 0,
+          "title": "Rejected Order Count",
+          "type": "integer"
+        },
+        "report_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion",
+          "default": "1.0.0"
+        },
+        "slippage_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Slippage Cost"
+        },
+        "spread_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Spread Cost"
+        },
+        "swap": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Swap"
+        },
+        "trade_count": {
+          "minimum": 0,
+          "title": "Trade Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "report_id",
+        "run_id",
+        "processed_bars",
+        "event_count",
+        "order_count",
+        "fill_count",
+        "trade_count",
+        "open_position_count",
+        "rejected_order_count",
+        "cancelled_order_count",
+        "final_account",
+        "gross_pnl",
+        "net_pnl",
+        "commission",
+        "spread_cost",
+        "slippage_cost",
+        "swap",
+        "deterministic_digest"
+      ],
+      "title": "BrokerSimulationReport",
+      "type": "object"
+    },
+    "CurrencyCode": {
+      "maxLength": 8,
+      "minLength": 3,
+      "pattern": "^[A-Z0-9]+$",
+      "type": "string"
+    },
+    "Fill": {
+      "additionalProperties": false,
+      "properties": {
+        "commission": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Commission"
+        },
+        "fill_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "order_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "price_ticks": {
+          "title": "Price Ticks",
+          "type": "integer"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "side": {
+          "$ref": "#/$defs/Side"
+        },
+        "slippage_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Slippage Cost"
+        },
+        "spread_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Spread Cost"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "time_ns": {
+          "minimum": 0,
+          "title": "Time Ns",
+          "type": "integer"
+        },
+        "volume_lots": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Lots"
+        }
+      },
+      "required": [
+        "fill_id",
+        "order_id",
+        "run_id",
+        "symbol",
+        "side",
+        "time_ns",
+        "price_ticks",
+        "volume_lots"
+      ],
+      "title": "Fill",
+      "type": "object"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "Order": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accepted Time Ns"
+        },
+        "activated_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Activated Time Ns"
+        },
+        "average_fill_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average Fill Price Ticks"
+        },
+        "filled_volume_lots": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Filled Volume Lots"
+        },
+        "order_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "rejection_reason": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection Reason"
+        },
+        "request": {
+          "$ref": "#/$defs/OrderRequest"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/OrderStatus",
+          "default": "created"
+        },
+        "terminal_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terminal Time Ns"
+        }
+      },
+      "required": [
+        "order_id",
+        "request"
+      ],
+      "title": "Order",
+      "type": "object"
+    },
+    "OrderRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "client_order_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "created_time_ns": {
+          "minimum": 0,
+          "title": "Created Time Ns",
+          "type": "integer"
+        },
+        "expiration_time_ns": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expiration Time Ns"
+        },
+        "order_type": {
+          "$ref": "#/$defs/OrderType"
+        },
+        "position_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "price_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price Ticks"
+        },
+        "reduce_only": {
+          "default": false,
+          "title": "Reduce Only",
+          "type": "boolean"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "side": {
+          "$ref": "#/$defs/Side"
+        },
+        "stop_loss_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Loss Ticks"
+        },
+        "strategy_instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "object"
+        },
+        "take_profit_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Take Profit Ticks"
+        },
+        "time_in_force": {
+          "$ref": "#/$defs/TimeInForce",
+          "default": "gtc"
+        },
+        "volume_lots": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Lots"
+        }
+      },
+      "required": [
+        "client_order_id",
+        "run_id",
+        "strategy_instance_id",
+        "symbol",
+        "side",
+        "order_type",
+        "volume_lots",
+        "created_time_ns"
+      ],
+      "title": "OrderRequest",
+      "type": "object"
+    },
+    "OrderStatus": {
+      "enum": [
+        "created",
+        "accepted",
+        "active",
+        "partially_filled",
+        "filled",
+        "cancelled",
+        "rejected",
+        "expired"
+      ],
+      "title": "OrderStatus",
+      "type": "string"
+    },
+    "OrderType": {
+      "enum": [
+        "market",
+        "limit",
+        "stop"
+      ],
+      "title": "OrderType",
+      "type": "string"
+    },
+    "Position": {
+      "additionalProperties": false,
+      "properties": {
+        "average_entry_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Entry Price Ticks"
+        },
+        "closed_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closed Time Ns"
+        },
+        "commission": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Commission"
+        },
+        "current_price_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Price Ticks"
+        },
+        "opened_time_ns": {
+          "minimum": 0,
+          "title": "Opened Time Ns",
+          "type": "integer"
+        },
+        "position_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "realized_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Realized Pnl"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "side": {
+          "$ref": "#/$defs/PositionSide"
+        },
+        "slippage_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Slippage Cost"
+        },
+        "spread_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Spread Cost"
+        },
+        "status": {
+          "$ref": "#/$defs/PositionStatus"
+        },
+        "stop_loss_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Loss Ticks"
+        },
+        "strategy_instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "swap": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Swap"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "take_profit_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Take Profit Ticks"
+        },
+        "unrealized_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Unrealized Pnl"
+        },
+        "volume_lots": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Lots"
+        }
+      },
+      "required": [
+        "position_id",
+        "run_id",
+        "strategy_instance_id",
+        "symbol",
+        "side",
+        "status",
+        "volume_lots",
+        "average_entry_price_ticks",
+        "opened_time_ns"
+      ],
+      "title": "Position",
+      "type": "object"
+    },
+    "PositionSide": {
+      "enum": [
+        "long",
+        "short"
+      ],
+      "title": "PositionSide",
+      "type": "string"
+    },
+    "PositionStatus": {
+      "enum": [
+        "open",
+        "closed"
+      ],
+      "title": "PositionStatus",
+      "type": "string"
+    },
+    "ReplayBar": {
+      "additionalProperties": false,
+      "properties": {
+        "close": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Close"
+        },
+        "close_time_ns": {
+          "exclusiveMinimum": 0,
+          "title": "Close Time Ns",
+          "type": "integer"
+        },
+        "high": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "High"
+        },
+        "is_complete": {
+          "default": true,
+          "title": "Is Complete",
+          "type": "boolean"
+        },
+        "low": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Low"
+        },
+        "open": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Open"
+        },
+        "open_time_ns": {
+          "minimum": 0,
+          "title": "Open Time Ns",
+          "type": "integer"
+        },
+        "real_volume": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Real Volume"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "source_spread_points": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Source Spread Points",
+          "type": "integer"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "tick_volume": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tick Volume",
+          "type": "integer"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        }
+      },
+      "required": [
+        "symbol",
+        "timeframe",
+        "sequence",
+        "open_time_ns",
+        "close_time_ns",
+        "open",
+        "high",
+        "low",
+        "close"
+      ],
+      "title": "ReplayBar",
+      "type": "object"
+    },
+    "ReplayMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "average_r_multiple": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average R Multiple"
+        },
+        "commission": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Commission"
+        },
+        "final_balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Final Balance"
+        },
+        "final_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Final Equity"
+        },
+        "gross_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Gross Pnl"
+        },
+        "initial_balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Initial Balance"
+        },
+        "long_trades": {
+          "minimum": 0,
+          "title": "Long Trades",
+          "type": "integer"
+        },
+        "losing_trades": {
+          "minimum": 0,
+          "title": "Losing Trades",
+          "type": "integer"
+        },
+        "max_drawdown_amount": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Amount"
+        },
+        "max_drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Percent"
+        },
+        "net_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Net Pnl"
+        },
+        "profit_factor": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profit Factor"
+        },
+        "short_trades": {
+          "minimum": 0,
+          "title": "Short Trades",
+          "type": "integer"
+        },
+        "slippage_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Slippage Cost"
+        },
+        "spread_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Spread Cost"
+        },
+        "swap": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Swap"
+        },
+        "total_trades": {
+          "minimum": 0,
+          "title": "Total Trades",
+          "type": "integer"
+        },
+        "win_rate": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Win Rate"
+        },
+        "winning_trades": {
+          "minimum": 0,
+          "title": "Winning Trades",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "initial_balance",
+        "final_balance",
+        "final_equity",
+        "gross_pnl",
+        "net_pnl",
+        "commission",
+        "spread_cost",
+        "slippage_cost",
+        "swap",
+        "total_trades",
+        "winning_trades",
+        "losing_trades",
+        "long_trades",
+        "short_trades",
+        "win_rate",
+        "max_drawdown_amount",
+        "max_drawdown_percent"
+      ],
+      "title": "ReplayMetrics",
+      "type": "object"
+    },
+    "ReplayRunDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "available_symbols": {
+          "items": {
+            "$ref": "#/$defs/SymbolCode"
+          },
+          "title": "Available Symbols",
+          "type": "array"
+        },
+        "available_timeframes": {
+          "items": {
+            "$ref": "#/$defs/Timeframe"
+          },
+          "title": "Available Timeframes",
+          "type": "array"
+        },
+        "dataset_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "default_symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "default_timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "end_time_ns": {
+          "exclusiveMinimum": 0,
+          "title": "End Time Ns",
+          "type": "integer"
+        },
+        "execution_timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "metrics": {
+          "$ref": "#/$defs/ReplayMetrics"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "start_time_ns": {
+          "minimum": 0,
+          "title": "Start Time Ns",
+          "type": "integer"
+        },
+        "strategy_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "strategy_instance_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "run_id",
+        "name",
+        "strategy_id",
+        "strategy_instance_id",
+        "dataset_id",
+        "default_symbol",
+        "default_timeframe",
+        "execution_timeframe",
+        "available_symbols",
+        "available_timeframes",
+        "start_time_ns",
+        "end_time_ns",
+        "metrics"
+      ],
+      "title": "ReplayRunDescriptor",
+      "type": "object"
+    },
+    "ReplayTimelineItem": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "broker_event",
+            "chart_command",
+            "strategy_action",
+            "strategy_log",
+            "account_snapshot"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Payload",
+          "type": "object"
+        },
+        "sequence": {
+          "exclusiveMinimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "time_ns": {
+          "minimum": 0,
+          "title": "Time Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sequence",
+        "time_ns",
+        "kind",
+        "payload"
+      ],
+      "title": "ReplayTimelineItem",
+      "type": "object"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "Sha256Hex": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "Side": {
+      "enum": [
+        "buy",
+        "sell"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "StrategyBacktestReport": {
+      "additionalProperties": false,
+      "properties": {
+        "action_count": {
+          "minimum": 0,
+          "title": "Action Count",
+          "type": "integer"
+        },
+        "action_error_count": {
+          "minimum": 0,
+          "title": "Action Error Count",
+          "type": "integer"
+        },
+        "broker_report": {
+          "$ref": "#/$defs/BrokerSimulationReport"
+        },
+        "callbacks": {
+          "$ref": "#/$defs/StrategyCallbackStatistics"
+        },
+        "chart_command_count": {
+          "minimum": 0,
+          "title": "Chart Command Count",
+          "type": "integer"
+        },
+        "deterministic_digest": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "feedback_round_count": {
+          "minimum": 0,
+          "title": "Feedback Round Count",
+          "type": "integer"
+        },
+        "log_record_count": {
+          "minimum": 0,
+          "title": "Log Record Count",
+          "type": "integer"
+        },
+        "output_digest": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "processed_close_batches": {
+          "minimum": 0,
+          "title": "Processed Close Batches",
+          "type": "integer"
+        },
+        "processed_execution_bars": {
+          "minimum": 0,
+          "title": "Processed Execution Bars",
+          "type": "integer"
+        },
+        "report_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "schema_version": {
+          "$ref": "#/$defs/SchemaVersion",
+          "default": "1.0.0"
+        },
+        "strategy_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "strategy_instance_id": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "required": [
+        "report_id",
+        "run_id",
+        "strategy_id",
+        "strategy_instance_id",
+        "processed_close_batches",
+        "processed_execution_bars",
+        "callbacks",
+        "action_count",
+        "chart_command_count",
+        "log_record_count",
+        "feedback_round_count",
+        "action_error_count",
+        "broker_report",
+        "output_digest",
+        "deterministic_digest"
+      ],
+      "title": "StrategyBacktestReport",
+      "type": "object"
+    },
+    "StrategyCallbackStatistics": {
+      "additionalProperties": false,
+      "properties": {
+        "bar": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Bar",
+          "type": "integer"
+        },
+        "order_update": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Order Update",
+          "type": "integer"
+        },
+        "start": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Start",
+          "type": "integer"
+        },
+        "stop": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Stop",
+          "type": "integer"
+        }
+      },
+      "title": "StrategyCallbackStatistics",
+      "type": "object"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "TimeInForce": {
+      "enum": [
+        "gtc",
+        "day"
+      ],
+      "title": "TimeInForce",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    },
+    "Trade": {
+      "additionalProperties": false,
+      "properties": {
+        "commission": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Commission"
+        },
+        "entry_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Entry Price Ticks"
+        },
+        "entry_time_ns": {
+          "minimum": 0,
+          "title": "Entry Time Ns",
+          "type": "integer"
+        },
+        "exit_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Exit Price Ticks"
+        },
+        "exit_reason": {
+          "maxLength": 160,
+          "minLength": 1,
+          "title": "Exit Reason",
+          "type": "string"
+        },
+        "exit_time_ns": {
+          "minimum": 0,
+          "title": "Exit Time Ns",
+          "type": "integer"
+        },
+        "gross_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Gross Pnl"
+        },
+        "initial_risk": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Initial Risk"
+        },
+        "intrabar_ambiguous": {
+          "default": false,
+          "title": "Intrabar Ambiguous",
+          "type": "boolean"
+        },
+        "mae": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Mae"
+        },
+        "mfe": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Mfe"
+        },
+        "net_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Net Pnl"
+        },
+        "position_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "realized_r_multiple": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Realized R Multiple"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "side": {
+          "$ref": "#/$defs/PositionSide"
+        },
+        "slippage_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Slippage Cost"
+        },
+        "spread_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Spread Cost"
+        },
+        "stop_loss_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Loss Ticks"
+        },
+        "strategy_instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "swap": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Swap"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "take_profit_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Take Profit Ticks"
+        },
+        "trade_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "volume_lots": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Lots"
+        }
+      },
+      "required": [
+        "trade_id",
+        "position_id",
+        "run_id",
+        "strategy_instance_id",
+        "symbol",
+        "side",
+        "volume_lots",
+        "entry_time_ns",
+        "exit_time_ns",
+        "entry_price_ticks",
+        "exit_price_ticks",
+        "gross_pnl",
+        "commission",
+        "spread_cost",
+        "slippage_cost",
+        "swap",
+        "net_pnl",
+        "exit_reason"
+      ],
+      "title": "Trade",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "account": {
+      "$ref": "#/$defs/AccountSnapshot"
+    },
+    "bars": {
+      "items": {
+        "$ref": "#/$defs/ReplayBar"
+      },
+      "title": "Bars",
+      "type": "array"
+    },
+    "broker_report": {
+      "$ref": "#/$defs/BrokerSimulationReport"
+    },
+    "cursor_sequence": {
+      "minimum": 0,
+      "title": "Cursor Sequence",
+      "type": "integer"
+    },
+    "cursor_time_ns": {
+      "minimum": 0,
+      "title": "Cursor Time Ns",
+      "type": "integer"
+    },
+    "fills": {
+      "items": {
+        "$ref": "#/$defs/Fill"
+      },
+      "title": "Fills",
+      "type": "array"
+    },
+    "orders": {
+      "items": {
+        "$ref": "#/$defs/Order"
+      },
+      "title": "Orders",
+      "type": "array"
+    },
+    "positions": {
+      "items": {
+        "$ref": "#/$defs/Position"
+      },
+      "title": "Positions",
+      "type": "array"
+    },
+    "price_digits": {
+      "minimum": 0,
+      "title": "Price Digits",
+      "type": "integer"
+    },
+    "price_tick_size": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Price Tick Size"
+    },
+    "progress": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Progress"
+    },
+    "run": {
+      "$ref": "#/$defs/ReplayRunDescriptor"
+    },
+    "strategy_report": {
+      "$ref": "#/$defs/StrategyBacktestReport"
+    },
+    "symbol": {
+      "$ref": "#/$defs/SymbolCode"
+    },
+    "timeframe": {
+      "$ref": "#/$defs/Timeframe"
+    },
+    "timeline": {
+      "items": {
+        "$ref": "#/$defs/ReplayTimelineItem"
+      },
+      "title": "Timeline",
+      "type": "array"
+    },
+    "trades": {
+      "items": {
+        "$ref": "#/$defs/Trade"
+      },
+      "title": "Trades",
+      "type": "array"
+    }
+  },
+  "required": [
+    "run",
+    "symbol",
+    "timeframe",
+    "cursor_sequence",
+    "cursor_time_ns",
+    "progress",
+    "price_digits",
+    "price_tick_size",
+    "bars",
+    "timeline",
+    "account",
+    "orders",
+    "positions",
+    "fills",
+    "trades",
+    "strategy_report",
+    "broker_report"
+  ],
+  "title": "ReplayBootstrap",
+  "type": "object"
+}

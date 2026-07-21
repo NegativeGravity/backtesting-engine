@@ -1,0 +1,42 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "play",
+        "pause",
+        "step_forward",
+        "step_backward",
+        "seek_progress",
+        "reset",
+        "set_speed",
+        "cancel"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Value"
+    }
+  },
+  "required": [
+    "action"
+  ],
+  "title": "LiveRunControlCommand",
+  "type": "object"
+}

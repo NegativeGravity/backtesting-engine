@@ -1,0 +1,102 @@
+{
+  "$defs": {
+    "Mt5ValidationTolerance": {
+      "additionalProperties": false,
+      "properties": {
+        "decimal_absolute": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "1E-8",
+          "title": "Decimal Absolute"
+        },
+        "money_absolute": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0.01",
+          "title": "Money Absolute"
+        },
+        "money_relative_bps": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "1",
+          "title": "Money Relative Bps"
+        }
+      },
+      "title": "Mt5ValidationTolerance",
+      "type": "object"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "fail_on_warning": {
+      "default": false,
+      "title": "Fail On Warning",
+      "type": "boolean"
+    },
+    "run_config_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Run Config Path"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "snapshot_path": {
+      "title": "Snapshot Path",
+      "type": "string"
+    },
+    "symbol_profile_paths": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Symbol Profile Paths",
+      "type": "array"
+    },
+    "tolerance": {
+      "$ref": "#/$defs/Mt5ValidationTolerance"
+    }
+  },
+  "required": [
+    "snapshot_path",
+    "symbol_profile_paths"
+  ],
+  "title": "Mt5ValidationConfig",
+  "type": "object"
+}

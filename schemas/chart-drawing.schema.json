@@ -1,0 +1,768 @@
+{
+  "$defs": {
+    "ChartLineStyle": {
+      "enum": [
+        "solid",
+        "dashed",
+        "dotted"
+      ],
+      "title": "ChartLineStyle",
+      "type": "string"
+    },
+    "ChartMarkerPosition": {
+      "enum": [
+        "above_bar",
+        "below_bar",
+        "in_bar"
+      ],
+      "title": "ChartMarkerPosition",
+      "type": "string"
+    },
+    "ChartMarkerShape": {
+      "enum": [
+        "arrow_up",
+        "arrow_down",
+        "circle",
+        "square"
+      ],
+      "title": "ChartMarkerShape",
+      "type": "string"
+    },
+    "ChartPoint": {
+      "additionalProperties": false,
+      "properties": {
+        "price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Price Ticks"
+        },
+        "time_ns": {
+          "minimum": 0,
+          "title": "Time Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "time_ns",
+        "price_ticks"
+      ],
+      "title": "ChartPoint",
+      "type": "object"
+    },
+    "FillAppearance": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/HexColor"
+        },
+        "opacity": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0.2",
+          "title": "Opacity"
+        }
+      },
+      "required": [
+        "color"
+      ],
+      "title": "FillAppearance",
+      "type": "object"
+    },
+    "HexColor": {
+      "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$",
+      "type": "string"
+    },
+    "HorizontalLineDrawing": {
+      "additionalProperties": false,
+      "properties": {
+        "appearance": {
+          "$ref": "#/$defs/LineAppearance"
+        },
+        "drawing_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "kind": {
+          "const": "horizontal_line",
+          "default": "horizontal_line",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "layer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "locked": {
+          "default": true,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Price Ticks"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "z_index": {
+          "default": 0,
+          "title": "Z Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "drawing_id",
+        "layer_id",
+        "symbol",
+        "timeframe",
+        "price_ticks",
+        "appearance"
+      ],
+      "title": "HorizontalLineDrawing",
+      "type": "object"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "LabelDrawing": {
+      "additionalProperties": false,
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/ChartPoint"
+        },
+        "background_color": {
+          "$ref": "#/$defs/HexColor"
+        },
+        "drawing_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "kind": {
+          "const": "label",
+          "default": "label",
+          "title": "Kind",
+          "type": "string"
+        },
+        "layer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "locked": {
+          "default": true,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "text": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "text_color": {
+          "$ref": "#/$defs/HexColor"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "z_index": {
+          "default": 0,
+          "title": "Z Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "drawing_id",
+        "layer_id",
+        "symbol",
+        "timeframe",
+        "anchor",
+        "text",
+        "text_color",
+        "background_color"
+      ],
+      "title": "LabelDrawing",
+      "type": "object"
+    },
+    "LineAppearance": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/HexColor"
+        },
+        "style": {
+          "$ref": "#/$defs/ChartLineStyle",
+          "default": "solid"
+        },
+        "width": {
+          "default": 1,
+          "maximum": 8,
+          "minimum": 1,
+          "title": "Width",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "color"
+      ],
+      "title": "LineAppearance",
+      "type": "object"
+    },
+    "MarkerDrawing": {
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "$ref": "#/$defs/HexColor"
+        },
+        "drawing_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "kind": {
+          "const": "marker",
+          "default": "marker",
+          "title": "Kind",
+          "type": "string"
+        },
+        "layer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "locked": {
+          "default": true,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "position": {
+          "$ref": "#/$defs/ChartMarkerPosition"
+        },
+        "price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price Ticks"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "shape": {
+          "$ref": "#/$defs/ChartMarkerShape"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "text": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Text"
+        },
+        "time_ns": {
+          "minimum": 0,
+          "title": "Time Ns",
+          "type": "integer"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "z_index": {
+          "default": 0,
+          "title": "Z Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "drawing_id",
+        "layer_id",
+        "symbol",
+        "timeframe",
+        "time_ns",
+        "shape",
+        "position",
+        "color"
+      ],
+      "title": "MarkerDrawing",
+      "type": "object"
+    },
+    "PositionSide": {
+      "enum": [
+        "long",
+        "short"
+      ],
+      "title": "PositionSide",
+      "type": "string"
+    },
+    "RectangleDrawing": {
+      "additionalProperties": false,
+      "properties": {
+        "border": {
+          "$ref": "#/$defs/LineAppearance"
+        },
+        "drawing_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "end": {
+          "$ref": "#/$defs/ChartPoint"
+        },
+        "fill": {
+          "$ref": "#/$defs/FillAppearance"
+        },
+        "kind": {
+          "const": "rectangle",
+          "default": "rectangle",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "maxLength": 160,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "layer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "locked": {
+          "default": true,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "start": {
+          "$ref": "#/$defs/ChartPoint"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "z_index": {
+          "default": 0,
+          "title": "Z Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "drawing_id",
+        "layer_id",
+        "symbol",
+        "timeframe",
+        "start",
+        "end",
+        "border",
+        "fill"
+      ],
+      "title": "RectangleDrawing",
+      "type": "object"
+    },
+    "RiskRewardDrawing": {
+      "additionalProperties": false,
+      "properties": {
+        "drawing_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "entry_line": {
+          "$ref": "#/$defs/LineAppearance"
+        },
+        "entry_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Entry Price Ticks"
+        },
+        "entry_time_ns": {
+          "minimum": 0,
+          "title": "Entry Time Ns",
+          "type": "integer"
+        },
+        "exit_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit Price Ticks"
+        },
+        "exit_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Exit Time Ns"
+        },
+        "kind": {
+          "const": "risk_reward",
+          "default": "risk_reward",
+          "title": "Kind",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "layer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "locked": {
+          "default": true,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "reward_fill": {
+          "$ref": "#/$defs/FillAppearance"
+        },
+        "risk_fill": {
+          "$ref": "#/$defs/FillAppearance"
+        },
+        "side": {
+          "$ref": "#/$defs/PositionSide"
+        },
+        "stop_line": {
+          "$ref": "#/$defs/LineAppearance"
+        },
+        "stop_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Stop Price Ticks"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "target_line": {
+          "$ref": "#/$defs/LineAppearance"
+        },
+        "target_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Target Price Ticks"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "trade_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "z_index": {
+          "default": 0,
+          "title": "Z Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "drawing_id",
+        "layer_id",
+        "symbol",
+        "timeframe",
+        "trade_id",
+        "side",
+        "entry_time_ns",
+        "entry_price_ticks",
+        "stop_price_ticks",
+        "target_price_ticks",
+        "risk_fill",
+        "reward_fill",
+        "entry_line",
+        "stop_line",
+        "target_line"
+      ],
+      "title": "RiskRewardDrawing",
+      "type": "object"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    },
+    "TrendLineDrawing": {
+      "additionalProperties": false,
+      "properties": {
+        "appearance": {
+          "$ref": "#/$defs/LineAppearance"
+        },
+        "drawing_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "end": {
+          "$ref": "#/$defs/ChartPoint"
+        },
+        "extend_left": {
+          "default": false,
+          "title": "Extend Left",
+          "type": "boolean"
+        },
+        "extend_right": {
+          "default": false,
+          "title": "Extend Right",
+          "type": "boolean"
+        },
+        "kind": {
+          "const": "trend_line",
+          "default": "trend_line",
+          "title": "Kind",
+          "type": "string"
+        },
+        "layer_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "locked": {
+          "default": true,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "start": {
+          "$ref": "#/$defs/ChartPoint"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        },
+        "visible": {
+          "default": true,
+          "title": "Visible",
+          "type": "boolean"
+        },
+        "z_index": {
+          "default": 0,
+          "title": "Z Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "drawing_id",
+        "layer_id",
+        "symbol",
+        "timeframe",
+        "start",
+        "end",
+        "appearance"
+      ],
+      "title": "TrendLineDrawing",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "horizontal_line": "#/$defs/HorizontalLineDrawing",
+      "label": "#/$defs/LabelDrawing",
+      "marker": "#/$defs/MarkerDrawing",
+      "rectangle": "#/$defs/RectangleDrawing",
+      "risk_reward": "#/$defs/RiskRewardDrawing",
+      "trend_line": "#/$defs/TrendLineDrawing"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/TrendLineDrawing"
+    },
+    {
+      "$ref": "#/$defs/HorizontalLineDrawing"
+    },
+    {
+      "$ref": "#/$defs/RectangleDrawing"
+    },
+    {
+      "$ref": "#/$defs/MarkerDrawing"
+    },
+    {
+      "$ref": "#/$defs/LabelDrawing"
+    },
+    {
+      "$ref": "#/$defs/RiskRewardDrawing"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+services:
+  app:
+    command:
+      - python
+      - -c
+      - "from vex_replay.api import main; raise SystemExit(main())"
+      - --project-root
+      - /app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"

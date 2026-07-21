@@ -1,0 +1,112 @@
+name: vex-backtesting
+services:
+  bootstrap:
+    image: vex-backtesting-engine:1.2.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "scripts/docker_bootstrap.py"]
+    environment:
+      VEX_DEMO_MAX_CLOSE_BATCHES: ${VEX_DEMO_MAX_CLOSE_BATCHES:-5000}
+      VEX_FORCE_REBUILD: ${VEX_FORCE_REBUILD:-0}
+    volumes:
+      - ./data:/app/data
+      - ./strategies:/app/strategies:ro
+    restart: "no"
+
+  engine:
+    image: vex-backtesting-engine:1.2.0
+    command:
+      - vex-engine
+      - --project-root
+      - /app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8001"
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    environment:
+      PYTHONPATH: /app/src:/app/strategies
+    ports:
+      - "${VEX_ENGINE_PORT:-8001}:8001"
+    volumes:
+      - ./data:/app/data
+      - ./strategies:/app/strategies:ro
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=3).read()
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
+    restart: unless-stopped
+
+  dashboard:
+    image: vex-backtesting-engine:1.2.0
+    command:
+      - vex-dashboard
+      - --project-root
+      - /app
+      - --engine-url
+      - http://engine:8001
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    depends_on:
+      engine:
+        condition: service_healthy
+    environment:
+      VEX_ENGINE_URL: http://engine:8001
+    ports:
+      - "${VEX_DASHBOARD_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/dashboard-health', timeout=3).read()
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 10s
+    restart: unless-stopped
+
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:17-alpine
+    profiles: ["infra"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vex}
+      POSTGRES_USER: ${POSTGRES_USER:-vex}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vex}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vex} -d ${POSTGRES_DB:-vex}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: public.ecr.aws/docker/library/redis:7.4-alpine
+    profiles: ["infra"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:

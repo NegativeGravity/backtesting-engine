@@ -1,0 +1,167 @@
+{
+  "$defs": {
+    "AnalyticsComparisonRow": {
+      "additionalProperties": false,
+      "properties": {
+        "max_drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Max Drawdown Percent"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "net_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Net Pnl"
+        },
+        "profit_factor": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profit Factor"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "sharpe_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sharpe Ratio"
+        },
+        "sortino_ratio": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sortino Ratio"
+        },
+        "total_return_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Total Return Percent"
+        },
+        "total_trades": {
+          "minimum": 0,
+          "title": "Total Trades",
+          "type": "integer"
+        },
+        "win_rate_percent": {
+          "anyOf": [
+            {
+              "maximum": 100.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Win Rate Percent"
+        }
+      },
+      "required": [
+        "run_id",
+        "name",
+        "net_pnl",
+        "total_return_percent",
+        "max_drawdown_percent",
+        "win_rate_percent",
+        "total_trades"
+      ],
+      "title": "AnalyticsComparisonRow",
+      "type": "object"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "rows": {
+      "items": {
+        "$ref": "#/$defs/AnalyticsComparisonRow"
+      },
+      "title": "Rows",
+      "type": "array"
+    },
+    "sort_by": {
+      "default": "net_pnl",
+      "enum": [
+        "net_pnl",
+        "total_return_percent",
+        "max_drawdown_percent",
+        "sharpe_ratio",
+        "profit_factor"
+      ],
+      "title": "Sort By",
+      "type": "string"
+    }
+  },
+  "required": [
+    "rows"
+  ],
+  "title": "AnalyticsComparisonReport",
+  "type": "object"
+}

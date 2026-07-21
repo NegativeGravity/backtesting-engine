@@ -1,0 +1,15 @@
+client_order_id: daily_sweep_order_0001
+run_id: run_xauusd_daily_sweep_v1
+strategy_instance_id: daily_sweep_primary
+symbol: XAUUSD
+side: buy
+order_type: limit
+volume_lots: "0.50"
+created_time_ns: 1735779900000000000
+price_ticks: 265000
+stop_loss_ticks: 264500
+take_profit_ticks: 266500
+time_in_force: gtc
+reduce_only: false
+tags:
+  setup: daily_sweep

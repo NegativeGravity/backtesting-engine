@@ -1,0 +1,23 @@
+command_type: upsert_drawing
+drawing:
+  kind: trend_line
+  drawing_id: trend_line_primary_0001
+  layer_id: strategy_daily_sweep
+  symbol: XAUUSD
+  timeframe: M5
+  revision: 1
+  visible: true
+  locked: true
+  z_index: 10
+  start:
+    time_ns: 1735779900000000000
+    price_ticks: "265000"
+  end:
+    time_ns: 1735780200000000000
+    price_ticks: "265250"
+  appearance:
+    color: "#3B82F6"
+    width: 2
+    style: solid
+  extend_left: false
+  extend_right: true

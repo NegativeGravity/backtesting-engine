@@ -1,0 +1,6 @@
+schema_version: 1.0.0
+annualization_days: 252
+risk_free_rate_percent: "0"
+confidence_level: "0.95"
+rolling_window_days: 30
+minimum_annualization_days: 30

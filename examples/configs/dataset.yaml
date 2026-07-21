@@ -1,0 +1,63 @@
+schema_version: 1.0.0
+dataset_id: xauusd_mt5_2025_2026
+version: "2"
+name: XAUUSD MT5 Multi-Timeframe 2025-2026
+source: mt5_csv
+root_path: data/mt5
+price_basis: bid
+source_timezone: UTC
+engine_timezone: UTC
+files:
+  - symbol: XAUUSD
+    timeframe: M1
+    relative_path: XAUUSD_M1_202501020105_202607131322.csv
+    declared_start: 2025-01-02T01:05:00Z
+    declared_end: 2026-07-13T13:22:00Z
+    row_count: 536737
+    size_bytes: 32982222
+    sha256: c8f80e74fddfe99db2aade1cf91bb3448100d5c4adfffe98c75b1d0cb13385ba
+  - symbol: XAUUSD
+    timeframe: M5
+    relative_path: XAUUSD_M5_202501020105_202607131320.csv
+    declared_start: 2025-01-02T01:05:00Z
+    declared_end: 2026-07-13T13:20:00Z
+    row_count: 107348
+    size_bytes: 6636895
+    sha256: 21bcd3962c0f5c7acef85b86fb399f5492927cd15dbdf252cae51fbbb49ba3ac
+  - symbol: XAUUSD
+    timeframe: M15
+    relative_path: XAUUSD_M15_202501020100_202607131315.csv
+    declared_start: 2025-01-02T01:00:00Z
+    declared_end: 2026-07-13T13:15:00Z
+    row_count: 36038
+    size_bytes: 2256757
+    sha256: 68487318e173f168996e643e1670dfc3925898097ec37951dfecfcbea61d981b
+  - symbol: XAUUSD
+    timeframe: H1
+    relative_path: XAUUSD_H1_202501020100_202607131300.csv
+    declared_start: 2025-01-02T01:00:00Z
+    declared_end: 2026-07-13T13:00:00Z
+    row_count: 9017
+    size_bytes: 567611
+    sha256: 19f6f9654777e968185730bf3cd74b522219c72576d66321a0556be19bb30b6b
+  - symbol: XAUUSD
+    timeframe: H4
+    relative_path: XAUUSD_H4_202501020000_202607131200.csv
+    declared_start: 2025-01-02T00:00:00Z
+    declared_end: 2026-07-13T12:00:00Z
+    row_count: 2359
+    size_bytes: 150103
+    sha256: 7053b3532f4b2c2e8cd1a12b5da31ec555d0ba957d5c93bdac9b34de7ed999a9
+  - symbol: XAUUSD
+    timeframe: D1
+    relative_path: XAUUSD_D1_202501020000_202607130000.csv
+    declared_start: 2025-01-02T00:00:00Z
+    declared_end: 2026-07-13T00:00:00Z
+    row_count: 394
+    size_bytes: 21723
+    sha256: a298113b001eac8018c8fc4a9aea50179d5ab215b9beb1339a48a3e4fc3d3a99
+metadata:
+  broker: configurable
+  export_format: mt5_bar_csv
+  daily_time_default: 00:00:00
+  trailing_bar_policy: validate_before_backtest

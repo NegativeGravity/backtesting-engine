@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+__pycache__
+.pytest_cache
+.pyright
+.ruff_cache
+apps/dashboard_web/node_modules
+apps/dashboard_web/dist
+data/cache
+data/replay
+*.zip

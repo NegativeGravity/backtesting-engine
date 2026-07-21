@@ -1,0 +1,15 @@
+schema_version: 1.0.0
+terminal_path: null
+login: null
+password_env: MT5_PASSWORD
+server: null
+portable: false
+timeout_ms: 60000
+symbols:
+  - XAUUSD
+sample_volumes:
+  - "0.01"
+  - "0.10"
+  - "1.00"
+sample_distance_points: 100
+snapshot_version: 1.0.0

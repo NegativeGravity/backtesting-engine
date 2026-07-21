@@ -1,0 +1,714 @@
+{
+  "$defs": {
+    "AccountSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Balance"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "drawdown_amount": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown Amount"
+        },
+        "drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown Percent"
+        },
+        "equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Equity"
+        },
+        "floating_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Floating Pnl"
+        },
+        "free_margin": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Free Margin"
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin"
+        },
+        "margin_level_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Margin Level Percent"
+        },
+        "peak_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Peak Equity"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp_ns": {
+          "minimum": 0,
+          "title": "Timestamp Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "timestamp_ns",
+        "sequence",
+        "currency",
+        "balance",
+        "equity",
+        "margin",
+        "free_margin",
+        "floating_pnl",
+        "peak_equity",
+        "drawdown_amount",
+        "drawdown_percent"
+      ],
+      "title": "AccountSnapshot",
+      "type": "object"
+    },
+    "CurrencyCode": {
+      "maxLength": 8,
+      "minLength": 3,
+      "pattern": "^[A-Z0-9]+$",
+      "type": "string"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "Order": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accepted Time Ns"
+        },
+        "activated_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Activated Time Ns"
+        },
+        "average_fill_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Average Fill Price Ticks"
+        },
+        "filled_volume_lots": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Filled Volume Lots"
+        },
+        "order_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "rejection_reason": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rejection Reason"
+        },
+        "request": {
+          "$ref": "#/$defs/OrderRequest"
+        },
+        "revision": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/OrderStatus",
+          "default": "created"
+        },
+        "terminal_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terminal Time Ns"
+        }
+      },
+      "required": [
+        "order_id",
+        "request"
+      ],
+      "title": "Order",
+      "type": "object"
+    },
+    "OrderRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "client_order_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "created_time_ns": {
+          "minimum": 0,
+          "title": "Created Time Ns",
+          "type": "integer"
+        },
+        "expiration_time_ns": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expiration Time Ns"
+        },
+        "order_type": {
+          "$ref": "#/$defs/OrderType"
+        },
+        "position_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "price_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Price Ticks"
+        },
+        "reduce_only": {
+          "default": false,
+          "title": "Reduce Only",
+          "type": "boolean"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "side": {
+          "$ref": "#/$defs/Side"
+        },
+        "stop_loss_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Loss Ticks"
+        },
+        "strategy_instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "tags": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "object"
+        },
+        "take_profit_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Take Profit Ticks"
+        },
+        "time_in_force": {
+          "$ref": "#/$defs/TimeInForce",
+          "default": "gtc"
+        },
+        "volume_lots": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Lots"
+        }
+      },
+      "required": [
+        "client_order_id",
+        "run_id",
+        "strategy_instance_id",
+        "symbol",
+        "side",
+        "order_type",
+        "volume_lots",
+        "created_time_ns"
+      ],
+      "title": "OrderRequest",
+      "type": "object"
+    },
+    "OrderStatus": {
+      "enum": [
+        "created",
+        "accepted",
+        "active",
+        "partially_filled",
+        "filled",
+        "cancelled",
+        "rejected",
+        "expired"
+      ],
+      "title": "OrderStatus",
+      "type": "string"
+    },
+    "OrderType": {
+      "enum": [
+        "market",
+        "limit",
+        "stop"
+      ],
+      "title": "OrderType",
+      "type": "string"
+    },
+    "Position": {
+      "additionalProperties": false,
+      "properties": {
+        "average_entry_price_ticks": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Average Entry Price Ticks"
+        },
+        "closed_time_ns": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Closed Time Ns"
+        },
+        "commission": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Commission"
+        },
+        "current_price_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Current Price Ticks"
+        },
+        "opened_time_ns": {
+          "minimum": 0,
+          "title": "Opened Time Ns",
+          "type": "integer"
+        },
+        "position_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "realized_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Realized Pnl"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "side": {
+          "$ref": "#/$defs/PositionSide"
+        },
+        "slippage_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Slippage Cost"
+        },
+        "spread_cost": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Spread Cost"
+        },
+        "status": {
+          "$ref": "#/$defs/PositionStatus"
+        },
+        "stop_loss_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stop Loss Ticks"
+        },
+        "strategy_instance_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "swap": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Swap"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "take_profit_ticks": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Take Profit Ticks"
+        },
+        "unrealized_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Unrealized Pnl"
+        },
+        "volume_lots": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Volume Lots"
+        }
+      },
+      "required": [
+        "position_id",
+        "run_id",
+        "strategy_instance_id",
+        "symbol",
+        "side",
+        "status",
+        "volume_lots",
+        "average_entry_price_ticks",
+        "opened_time_ns"
+      ],
+      "title": "Position",
+      "type": "object"
+    },
+    "PositionSide": {
+      "enum": [
+        "long",
+        "short"
+      ],
+      "title": "PositionSide",
+      "type": "string"
+    },
+    "PositionStatus": {
+      "enum": [
+        "open",
+        "closed"
+      ],
+      "title": "PositionStatus",
+      "type": "string"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "Side": {
+      "enum": [
+        "buy",
+        "sell"
+      ],
+      "title": "Side",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "TimeInForce": {
+      "enum": [
+        "gtc",
+        "day"
+      ],
+      "title": "TimeInForce",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "account": {
+      "$ref": "#/$defs/AccountSnapshot"
+    },
+    "event_sequence": {
+      "minimum": 0,
+      "title": "Event Sequence",
+      "type": "integer"
+    },
+    "orders": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Order"
+      },
+      "title": "Orders",
+      "type": "array"
+    },
+    "positions": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Position"
+      },
+      "title": "Positions",
+      "type": "array"
+    },
+    "run_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "timestamp_ns": {
+      "minimum": 0,
+      "title": "Timestamp Ns",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "run_id",
+    "timestamp_ns",
+    "event_sequence",
+    "account"
+  ],
+  "title": "BrokerStateSnapshot",
+  "type": "object"
+}

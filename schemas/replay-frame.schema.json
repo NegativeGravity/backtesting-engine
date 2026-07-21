@@ -1,0 +1,452 @@
+{
+  "$defs": {
+    "AccountSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "balance": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Balance"
+        },
+        "currency": {
+          "$ref": "#/$defs/CurrencyCode"
+        },
+        "drawdown_amount": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown Amount"
+        },
+        "drawdown_percent": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Drawdown Percent"
+        },
+        "equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Equity"
+        },
+        "floating_pnl": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Floating Pnl"
+        },
+        "free_margin": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Free Margin"
+        },
+        "margin": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Margin"
+        },
+        "margin_level_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Margin Level Percent"
+        },
+        "peak_equity": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Peak Equity"
+        },
+        "run_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "timestamp_ns": {
+          "minimum": 0,
+          "title": "Timestamp Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run_id",
+        "timestamp_ns",
+        "sequence",
+        "currency",
+        "balance",
+        "equity",
+        "margin",
+        "free_margin",
+        "floating_pnl",
+        "peak_equity",
+        "drawdown_amount",
+        "drawdown_percent"
+      ],
+      "title": "AccountSnapshot",
+      "type": "object"
+    },
+    "CurrencyCode": {
+      "maxLength": 8,
+      "minLength": 3,
+      "pattern": "^[A-Z0-9]+$",
+      "type": "string"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "ReplayBar": {
+      "additionalProperties": false,
+      "properties": {
+        "close": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Close"
+        },
+        "close_time_ns": {
+          "exclusiveMinimum": 0,
+          "title": "Close Time Ns",
+          "type": "integer"
+        },
+        "high": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "High"
+        },
+        "is_complete": {
+          "default": true,
+          "title": "Is Complete",
+          "type": "boolean"
+        },
+        "low": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Low"
+        },
+        "open": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "title": "Open"
+        },
+        "open_time_ns": {
+          "minimum": 0,
+          "title": "Open Time Ns",
+          "type": "integer"
+        },
+        "real_volume": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+              "type": "string"
+            }
+          ],
+          "default": "0",
+          "title": "Real Volume"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "source_spread_points": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Source Spread Points",
+          "type": "integer"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "tick_volume": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Tick Volume",
+          "type": "integer"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        }
+      },
+      "required": [
+        "symbol",
+        "timeframe",
+        "sequence",
+        "open_time_ns",
+        "close_time_ns",
+        "open",
+        "high",
+        "low",
+        "close"
+      ],
+      "title": "ReplayBar",
+      "type": "object"
+    },
+    "ReplayTimelineItem": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "broker_event",
+            "chart_command",
+            "strategy_action",
+            "strategy_log",
+            "account_snapshot"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Payload",
+          "type": "object"
+        },
+        "sequence": {
+          "exclusiveMinimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "time_ns": {
+          "minimum": 0,
+          "title": "Time Ns",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sequence",
+        "time_ns",
+        "kind",
+        "payload"
+      ],
+      "title": "ReplayTimelineItem",
+      "type": "object"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "account": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AccountSnapshot"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "bars": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ReplayBar"
+      },
+      "title": "Bars",
+      "type": "array"
+    },
+    "cursor_sequence": {
+      "minimum": 0,
+      "title": "Cursor Sequence",
+      "type": "integer"
+    },
+    "cursor_time_ns": {
+      "minimum": 0,
+      "title": "Cursor Time Ns",
+      "type": "integer"
+    },
+    "frame_type": {
+      "enum": [
+        "advance",
+        "reset",
+        "state",
+        "completed"
+      ],
+      "title": "Frame Type",
+      "type": "string"
+    },
+    "playing": {
+      "title": "Playing",
+      "type": "boolean"
+    },
+    "progress": {
+      "anyOf": [
+        {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Progress"
+    },
+    "speed": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0.0,
+          "type": "number"
+        },
+        {
+          "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+          "type": "string"
+        }
+      ],
+      "title": "Speed"
+    },
+    "timeline": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ReplayTimelineItem"
+      },
+      "title": "Timeline",
+      "type": "array"
+    }
+  },
+  "required": [
+    "frame_type",
+    "cursor_sequence",
+    "cursor_time_ns",
+    "progress",
+    "playing",
+    "speed"
+  ],
+  "title": "ReplayFrame",
+  "type": "object"
+}

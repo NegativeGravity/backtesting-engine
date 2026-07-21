@@ -1,0 +1,19 @@
+schema_version: 1.0.0
+strategy_id: replace_me
+name: Replace Me
+version: 1.0.0
+entrypoint: _template.strategy:ReplaceMeStrategy
+description: Strategy package template.
+subscriptions:
+  - symbol: XAUUSD
+    timeframe: M1
+    higher_timeframe_access: closed_only
+capabilities:
+  chart_drawings: true
+  custom_series: true
+  bar_events: true
+  quote_events: false
+  order_updates: true
+default_parameters: {}
+tags:
+  - template

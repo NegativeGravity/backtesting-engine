@@ -1,0 +1,266 @@
+{
+  "$defs": {
+    "DatasetFile": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_end": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual End"
+        },
+        "actual_start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actual Start"
+        },
+        "declared_end": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declared End"
+        },
+        "declared_start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Declared Start"
+        },
+        "relative_path": {
+          "maxLength": 512,
+          "minLength": 1,
+          "title": "Relative Path",
+          "type": "string"
+        },
+        "row_count": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Row Count"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Size Bytes"
+        },
+        "symbol": {
+          "$ref": "#/$defs/SymbolCode"
+        },
+        "timeframe": {
+          "$ref": "#/$defs/Timeframe"
+        }
+      },
+      "required": [
+        "symbol",
+        "timeframe",
+        "relative_path"
+      ],
+      "title": "DatasetFile",
+      "type": "object"
+    },
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "PriceBasis": {
+      "enum": [
+        "bid",
+        "ask",
+        "mid"
+      ],
+      "title": "PriceBasis",
+      "type": "string"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "Sha256Hex": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "content_hash": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "dataset_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "engine_timezone": {
+      "const": "UTC",
+      "default": "UTC",
+      "title": "Engine Timezone",
+      "type": "string"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/DatasetFile"
+      },
+      "minItems": 1,
+      "title": "Files",
+      "type": "array"
+    },
+    "metadata": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Metadata",
+      "type": "object"
+    },
+    "name": {
+      "maxLength": 160,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "price_basis": {
+      "$ref": "#/$defs/PriceBasis",
+      "default": "bid"
+    },
+    "root_path": {
+      "maxLength": 512,
+      "minLength": 1,
+      "title": "Root Path",
+      "type": "string"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "source": {
+      "const": "mt5_csv",
+      "default": "mt5_csv",
+      "title": "Source",
+      "type": "string"
+    },
+    "source_timezone": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Source Timezone",
+      "type": "string"
+    },
+    "version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "dataset_id",
+    "version",
+    "name",
+    "root_path",
+    "source_timezone",
+    "files"
+  ],
+  "title": "DatasetManifest",
+  "type": "object"
+}

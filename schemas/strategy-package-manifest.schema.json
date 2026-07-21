@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "descriptor_path": {
+      "default": "strategy.yaml",
+      "title": "Descriptor Path",
+      "type": "string"
+    },
+    "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "import_report_path": {
+      "default": "../../data/cache/xauusd_mt5_2025_2026/2/import-report.json",
+      "title": "Import Report Path",
+      "type": "string"
+    },
+    "package_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "run_config_path": {
+      "default": "run.yaml",
+      "title": "Run Config Path",
+      "type": "string"
+    },
+    "runtime_config_path": {
+      "default": "runtime.yaml",
+      "title": "Runtime Config Path",
+      "type": "string"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "symbol_profile_paths": {
+      "default": [
+        "../../examples/configs/symbol_xauusd.yaml"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "title": "Symbol Profile Paths",
+      "type": "array"
+    }
+  },
+  "required": [
+    "package_id"
+  ],
+  "title": "StrategyPackageManifest",
+  "type": "object"
+}

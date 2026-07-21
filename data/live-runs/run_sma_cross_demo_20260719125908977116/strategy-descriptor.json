@@ -1,0 +1,49 @@
+{
+  "capabilities": {
+    "bar_events": true,
+    "chart_drawings": true,
+    "custom_series": true,
+    "order_updates": true,
+    "quote_events": false
+  },
+  "default_parameters": {
+    "allow_long": true,
+    "allow_short": true,
+    "fast_period": 10,
+    "reward_risk_ratio": "2",
+    "signal_timeframe": "M5",
+    "slow_period": 30,
+    "stop_distance_ticks": 800,
+    "symbol": "XAUUSD",
+    "volume_lots": "0.10"
+  },
+  "description": "End-to-end MT5 candle demo using a fast and slow moving-average crossover.",
+  "entrypoint": "sma_cross_demo.strategy:SmaCrossStrategy",
+  "name": "SMA Cross Demo",
+  "schema_version": "1.0.0",
+  "strategy_id": "sma_cross_demo",
+  "subscriptions": [
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "XAUUSD",
+      "timeframe": "M1"
+    },
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "XAUUSD",
+      "timeframe": "M5"
+    },
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "XAUUSD",
+      "timeframe": "H1"
+    }
+  ],
+  "tags": [
+    "demo",
+    "sma",
+    "mt5",
+    "end_to_end"
+  ],
+  "version": "1.0.0"
+}

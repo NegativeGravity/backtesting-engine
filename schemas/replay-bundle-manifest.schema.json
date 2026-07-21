@@ -1,0 +1,258 @@
+{
+  "$defs": {
+    "Identifier": {
+      "maxLength": 128,
+      "minLength": 3,
+      "pattern": "^[a-z0-9][a-z0-9._:-]*$",
+      "type": "string"
+    },
+    "SchemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "Sha256Hex": {
+      "maxLength": 64,
+      "minLength": 64,
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "SymbolCode": {
+      "maxLength": 32,
+      "minLength": 1,
+      "pattern": "^[A-Z0-9._-]+$",
+      "type": "string"
+    },
+    "Timeframe": {
+      "enum": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "M6",
+        "M10",
+        "M12",
+        "M15",
+        "M20",
+        "M30",
+        "H1",
+        "H2",
+        "H3",
+        "H4",
+        "H6",
+        "H8",
+        "H12",
+        "D1",
+        "W1",
+        "MN1"
+      ],
+      "title": "Timeframe",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "account_snapshot_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Account Snapshot Count",
+      "type": "integer"
+    },
+    "analytics_report_path": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Analytics Report Path"
+    },
+    "available_symbols": {
+      "items": {
+        "$ref": "#/$defs/SymbolCode"
+      },
+      "title": "Available Symbols",
+      "type": "array"
+    },
+    "available_timeframes": {
+      "items": {
+        "$ref": "#/$defs/Timeframe"
+      },
+      "title": "Available Timeframes",
+      "type": "array"
+    },
+    "bundle_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "dataset_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "dataset_version": {
+      "maxLength": 64,
+      "minLength": 1,
+      "title": "Dataset Version",
+      "type": "string"
+    },
+    "default_symbol": {
+      "$ref": "#/$defs/SymbolCode"
+    },
+    "default_timeframe": {
+      "$ref": "#/$defs/Timeframe"
+    },
+    "end_time_ns": {
+      "exclusiveMinimum": 0,
+      "title": "End Time Ns",
+      "type": "integer"
+    },
+    "equity_point_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Equity Point Count",
+      "type": "integer"
+    },
+    "execution_timeframe": {
+      "$ref": "#/$defs/Timeframe"
+    },
+    "import_report_path": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Import Report Path",
+      "type": "string"
+    },
+    "max_close_batches": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Close Batches"
+    },
+    "name": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "run_config_path": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Run Config Path",
+      "type": "string"
+    },
+    "run_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "runtime_config_path": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Runtime Config Path",
+      "type": "string"
+    },
+    "schema_version": {
+      "$ref": "#/$defs/SchemaVersion",
+      "default": "1.0.0"
+    },
+    "sqlite_path": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Sqlite Path",
+      "type": "string"
+    },
+    "start_time_ns": {
+      "minimum": 0,
+      "title": "Start Time Ns",
+      "type": "integer"
+    },
+    "strategy_descriptor_path": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Strategy Descriptor Path",
+      "type": "string"
+    },
+    "strategy_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "strategy_instance_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "strategy_report_path": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Strategy Report Path",
+      "type": "string"
+    },
+    "strategy_source_path": {
+      "anyOf": [
+        {
+          "maxLength": 500,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Strategy Source Path"
+    },
+    "strategy_source_sha256": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "symbol_profile_paths": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Symbol Profile Paths",
+      "type": "array"
+    },
+    "timeline_item_count": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Timeline Item Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "bundle_id",
+    "run_id",
+    "name",
+    "strategy_id",
+    "strategy_instance_id",
+    "dataset_id",
+    "dataset_version",
+    "default_symbol",
+    "default_timeframe",
+    "execution_timeframe",
+    "available_symbols",
+    "available_timeframes",
+    "start_time_ns",
+    "end_time_ns",
+    "import_report_path",
+    "sqlite_path",
+    "symbol_profile_paths",
+    "strategy_report_path",
+    "run_config_path",
+    "strategy_descriptor_path",
+    "runtime_config_path"
+  ],
+  "title": "ReplayBundleManifest",
+  "type": "object"
+}

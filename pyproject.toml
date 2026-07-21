@@ -1,0 +1,85 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vex-backtesting-engine"
+version = "1.2.0"
+description = "Production-grade candle-by-candle MT5 backtesting platform with isolated strategies, replay, analytics, and dashboard services"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.12,<3",
+    "PyYAML>=6.0,<7",
+    "tzdata>=2025.2",
+    "polars>=1.30,<2",
+    "pyarrow>=19,<25",
+    "fastapi>=0.116,<1",
+    "uvicorn>=0.35,<1",
+    "websockets>=15,<16",
+    "httpx>=0.28,<1",
+]
+
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+default = true
+
+[dependency-groups]
+dev = [
+    "hypothesis>=6.120,<7",
+    "pre-commit>=4,<5",
+    "pyright>=1.1.390,<2",
+    "pytest>=9,<10",
+    "pytest-cov>=7,<8",
+    "ruff>=0.9,<1",
+    "types-PyYAML>=6.0.12,<7",
+]
+
+[project.scripts]
+vex-contracts = "vex_contracts.cli:main"
+vex-data = "vex_data_engine.cli:main"
+vex-broker = "vex_broker.cli:main"
+vex-strategy = "vex_strategy.cli:main"
+vex-replay = "vex_replay.cli:main"
+vex-api = "vex_replay.api:main"
+vex-engine = "vex_orchestrator.api:main"
+vex-dashboard = "vex_dashboard.api:main"
+vex-analytics = "vex_analytics.cli:main"
+vex-mt5 = "vex_mt5.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vex_contracts", "src/vex_data_engine", "src/vex_broker", "src/vex_strategy", "src/vex_replay", "src/vex_analytics", "src/vex_mt5", "src/vex_example_strategies", "src/vex_orchestrator", "src/vex_dashboard"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient` is deprecated.*"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+include = ["src"]
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportPrivateImportUsage = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportUnusedFunction = false

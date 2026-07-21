@@ -1,0 +1,42 @@
+schema_version: 1.0.0
+strategy_id: sdk_smoke
+name: Strategy SDK Smoke
+version: 1.0.0
+entrypoint: vex_example_strategies.sdk_smoke:SdkSmokeStrategy
+description: Deterministic multi-timeframe strategy used to validate the Strategy SDK.
+subscriptions:
+  - symbol: XAUUSD
+    timeframe: M1
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: M5
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: M15
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: H1
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: H4
+    higher_timeframe_access: closed_only
+  - symbol: XAUUSD
+    timeframe: D1
+    higher_timeframe_access: closed_only
+capabilities:
+  chart_drawings: true
+  custom_series: true
+  bar_events: true
+  quote_events: false
+  order_updates: true
+default_parameters:
+  symbol: XAUUSD
+  entry_after_bars: 2
+  hold_bars: 20
+  volume_lots: "0.10"
+  stop_distance_ticks: 5000
+  target_distance_ticks: 5000
+tags:
+  - sdk
+  - smoke
+  - multi_timeframe

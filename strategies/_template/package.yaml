@@ -1,0 +1,9 @@
+schema_version: 1.0.0
+package_id: replace_me
+descriptor_path: strategy.yaml
+run_config_path: run.yaml
+runtime_config_path: runtime.yaml
+symbol_profile_paths:
+  - ../../examples/configs/symbol_xauusd.yaml
+import_report_path: ../../data/cache/xauusd_mt5_2025_2026/2/import-report.json
+enabled: false
