@@ -1,5 +1,6 @@
 import json
 import sqlite3
+import threading
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -75,6 +76,9 @@ class _RunContext:
     database_path: Path
     metrics: ReplayMetrics
     analytics_report: AnalyticsReport
+    has_state_snapshots: bool
+    has_terminal_orders: bool
+    database_signature: tuple[int, int]
 
 
 class ReplayRunNotFoundError(KeyError):
@@ -90,6 +94,7 @@ class ReplayRunRepository:
         self.project_root = Path(project_root).resolve()
         self.runs_root = self.project_root / runs_root
         self._contexts: dict[str, _RunContext] = {}
+        self._connections = threading.local()
         self.refresh()
 
     def refresh(self) -> None:
@@ -121,6 +126,15 @@ class ReplayRunRepository:
                 if row is None:
                     raise ValueError(f"replay metrics missing for {manifest.run_id}")
                 metrics = ReplayMetrics.model_validate(json.loads(str(row[0])))
+                has_state_snapshots = connection.execute(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type = 'table' AND name = 'broker_state_snapshots'"
+                ).fetchone() is not None
+                has_terminal_orders = connection.execute(
+                    "SELECT 1 FROM sqlite_master "
+                    "WHERE type = 'table' AND name = 'terminal_orders'"
+                ).fetchone() is not None
+            database_stat = database_path.stat()
             analytics_path = (
                 self.project_root / manifest.analytics_report_path
                 if manifest.analytics_report_path is not None
@@ -148,6 +162,9 @@ class ReplayRunRepository:
                 database_path=database_path,
                 metrics=metrics,
                 analytics_report=analytics_report,
+                has_state_snapshots=has_state_snapshots,
+                has_terminal_orders=has_terminal_orders,
+                database_signature=(database_stat.st_mtime_ns, database_stat.st_size),
             )
         self._contexts = contexts
 
@@ -326,12 +343,12 @@ class ReplayRunRepository:
         limit: int = 10000,
     ) -> tuple[ReplayTimelineItem, ...]:
         context = self._context(run_id)
-        with sqlite3.connect(context.database_path) as connection:
-            rows = connection.execute(
-                "SELECT sequence, time_ns, kind, payload FROM timeline "
-                "WHERE time_ns > ? AND time_ns <= ? ORDER BY sequence LIMIT ?",
-                (start_exclusive_ns, end_inclusive_ns, limit),
-            ).fetchall()
+        connection = self._connection(context)
+        rows = connection.execute(
+            "SELECT sequence, time_ns, kind, payload FROM timeline "
+            "WHERE time_ns > ? AND time_ns <= ? ORDER BY sequence LIMIT ?",
+            (start_exclusive_ns, end_inclusive_ns, limit),
+        ).fetchall()
         return tuple(
             ReplayTimelineItem(
                 sequence=int(sequence),
@@ -349,12 +366,14 @@ class ReplayRunRepository:
         limit: int = 50000,
     ) -> tuple[ReplayTimelineItem, ...]:
         context = self._context(run_id)
-        with sqlite3.connect(context.database_path) as connection:
-            rows = connection.execute(
-                "SELECT sequence, time_ns, kind, payload FROM timeline "
-                "WHERE time_ns <= ? ORDER BY sequence LIMIT ?",
-                (end_inclusive_ns, limit),
-            ).fetchall()
+        connection = self._connection(context)
+        rows = connection.execute(
+            "SELECT sequence, time_ns, kind, payload FROM ("
+            "SELECT sequence, time_ns, kind, payload FROM timeline "
+            "WHERE time_ns <= ? ORDER BY sequence DESC LIMIT ?"
+            ") ORDER BY sequence",
+            (end_inclusive_ns, limit),
+        ).fetchall()
         return tuple(
             ReplayTimelineItem(
                 sequence=int(sequence),
@@ -367,16 +386,16 @@ class ReplayRunRepository:
 
     def account_at(self, run_id: str, time_ns: int) -> AccountSnapshot:
         context = self._context(run_id)
-        with sqlite3.connect(context.database_path) as connection:
+        connection = self._connection(context)
+        row = connection.execute(
+            "SELECT payload FROM account_snapshots WHERE time_ns <= ? "
+            "ORDER BY time_ns DESC LIMIT 1",
+            (time_ns,),
+        ).fetchone()
+        if row is None:
             row = connection.execute(
-                "SELECT payload FROM account_snapshots WHERE time_ns <= ? "
-                "ORDER BY time_ns DESC LIMIT 1",
-                (time_ns,),
+                "SELECT payload FROM account_snapshots ORDER BY time_ns LIMIT 1"
             ).fetchone()
-            if row is None:
-                row = connection.execute(
-                    "SELECT payload FROM account_snapshots ORDER BY time_ns LIMIT 1"
-                ).fetchone()
         if row is None:
             return context.strategy_report.broker_report.final_account.model_copy(
                 update={
@@ -398,31 +417,52 @@ class ReplayRunRepository:
         self,
         run_id: str,
         time_ns: int,
+        history_limit: int | None = None,
     ) -> tuple[tuple[Order, ...], tuple[Position, ...], tuple[Fill, ...], tuple[Trade, ...]]:
         context = self._context(run_id)
         orders: dict[str, Order] = {}
         positions: dict[str, Position] = {}
-        with sqlite3.connect(context.database_path) as connection:
-            rows = connection.execute(
-                "SELECT event_type, payload FROM broker_events WHERE time_ns <= ? "
-                "ORDER BY sequence",
+        connection = self._connection(context)
+        snapshot_time_ns = context.manifest.start_time_ns - 1
+        snapshot_sequence = 0
+        if context.has_state_snapshots:
+            snapshot_row = connection.execute(
+                "SELECT time_ns, event_sequence, orders, positions "
+                "FROM broker_state_snapshots WHERE time_ns <= ? "
+                "ORDER BY time_ns DESC, event_sequence DESC LIMIT 1",
                 (time_ns,),
-            ).fetchall()
-            order_rows = connection.execute(
-                "SELECT payload FROM entities WHERE entity_type = 'order' AND event_time_ns <= ? "
-                "ORDER BY event_time_ns, entity_id",
-                (time_ns,),
-            ).fetchall()
-            fill_rows = connection.execute(
-                "SELECT payload FROM entities WHERE entity_type = 'fill' AND event_time_ns <= ? "
-                "ORDER BY event_time_ns, entity_id",
-                (time_ns,),
-            ).fetchall()
-            trade_rows = connection.execute(
-                "SELECT payload FROM entities WHERE entity_type = 'trade' AND event_time_ns <= ? "
-                "ORDER BY event_time_ns, entity_id",
-                (time_ns,),
-            ).fetchall()
+            ).fetchone()
+            if snapshot_row is not None:
+                snapshot_time_ns = int(snapshot_row[0])
+                snapshot_sequence = int(snapshot_row[1])
+                orders = {
+                    order.order_id: order
+                    for order in (
+                        Order.model_validate(value)
+                        for value in cast(list[Any], json.loads(str(snapshot_row[2])))
+                    )
+                }
+                positions = {
+                    position.position_id: position
+                    for position in (
+                        Position.model_validate(value)
+                        for value in cast(list[Any], json.loads(str(snapshot_row[3])))
+                    )
+                }
+        rows = connection.execute(
+            "SELECT event_type, payload FROM broker_events "
+            "WHERE time_ns <= ? AND (time_ns > ? OR (time_ns = ? AND sequence > ?)) "
+            "ORDER BY sequence",
+            (time_ns, snapshot_time_ns, snapshot_time_ns, snapshot_sequence),
+        ).fetchall()
+        order_rows = self._terminal_order_rows(
+            connection,
+            context.has_terminal_orders,
+            time_ns,
+            history_limit,
+        )
+        fill_rows = self._history_entity_rows(connection, "fill", time_ns, history_limit)
+        trade_rows = self._history_entity_rows(connection, "trade", time_ns, history_limit)
         for event_type_raw, envelope_raw in rows:
             envelope = cast(dict[str, Any], json.loads(str(envelope_raw)))
             payload = cast(dict[str, Any], envelope["payload"])
@@ -436,6 +476,15 @@ class ReplayRunRepository:
                     {key: payload[key] for key in Order.model_fields if key in payload}
                 )
                 orders[order.order_id] = order
+            if event_type is EventType.ACCOUNT_UPDATED:
+                snapshot_positions = payload.get("positions", ())
+                if isinstance(snapshot_positions, list):
+                    positions = {
+                        position.position_id: position
+                        for position in (
+                            Position.model_validate(value) for value in snapshot_positions
+                        )
+                    }
             if event_type in {EventType.POSITION_OPENED, EventType.POSITION_UPDATED}:
                 position = Position.model_validate(payload)
                 positions[position.position_id] = position
@@ -475,7 +524,11 @@ class ReplayRunRepository:
         cursor = execution.close_time_ns
         bars = self.history(run_id, selected_symbol, selected_timeframe, cursor, history_count)
         timeline = self.timeline_until(run_id, cursor)
-        orders, positions, fills, trades = self.state_at(run_id, cursor)
+        orders, positions, fills, trades = self.state_at(
+            run_id,
+            cursor,
+            history_limit=5_000,
+        )
         progress = self.progress(run_id, cursor)
         profile = context.profiles[selected_symbol]
         return ReplayBootstrap(
@@ -611,6 +664,92 @@ class ReplayRunRepository:
                 )
             )
         return tuple(result)
+
+    def close(self) -> None:
+        connections = getattr(self._connections, "values", {})
+        for _, connection in connections.values():
+            connection.close()
+        self._connections.values = {}
+
+    def _connection(self, context: _RunContext) -> sqlite3.Connection:
+        connections: dict[str, tuple[tuple[int, int], sqlite3.Connection]] = getattr(
+            self._connections, "values", {}
+        )
+        key = str(context.database_path)
+        cached = connections.get(key)
+        if cached is not None and cached[0] == context.database_signature:
+            return cached[1]
+        if cached is not None:
+            cached[1].close()
+        uri = f"{context.database_path.as_uri()}?mode=ro&immutable=1"
+        connection = sqlite3.connect(uri, uri=True, check_same_thread=True)
+        connection.execute("PRAGMA query_only = ON")
+        connection.execute("PRAGMA busy_timeout = 5000")
+        connection.execute("PRAGMA cache_size = -32768")
+        connection.execute("PRAGMA mmap_size = 268435456")
+        connections[key] = (context.database_signature, connection)
+        self._connections.values = connections
+        return connection
+
+    @staticmethod
+    def _terminal_order_rows(
+        connection: sqlite3.Connection,
+        has_terminal_orders: bool,
+        time_ns: int,
+        limit: int | None,
+    ) -> list[tuple[Any, ...]]:
+        if has_terminal_orders:
+            table = "terminal_orders"
+            time_column = "terminal_time_ns"
+            id_column = "order_id"
+            predicate = "terminal_time_ns <= ?"
+            parameters: tuple[Any, ...] = (time_ns,)
+        else:
+            table = "entities"
+            time_column = "event_time_ns"
+            id_column = "entity_id"
+            predicate = "entity_type = 'order' AND event_time_ns <= ?"
+            parameters = (time_ns,)
+        if limit is None:
+            return connection.execute(
+                f"SELECT payload FROM {table} WHERE {predicate} "
+                f"ORDER BY {time_column}, {id_column}",
+                parameters,
+            ).fetchall()
+        if limit <= 0:
+            return []
+        return connection.execute(
+            f"SELECT payload FROM ("
+            f"SELECT {time_column}, {id_column}, payload FROM {table} "
+            f"WHERE {predicate} ORDER BY {time_column} DESC, {id_column} DESC LIMIT ?"
+            f") ORDER BY {time_column}, {id_column}",
+            (*parameters, limit),
+        ).fetchall()
+
+    @staticmethod
+    def _history_entity_rows(
+        connection: sqlite3.Connection,
+        entity_type: str,
+        time_ns: int,
+        limit: int | None,
+    ) -> list[tuple[Any, ...]]:
+        if limit is None:
+            return connection.execute(
+                "SELECT payload FROM entities "
+                "WHERE entity_type = ? AND event_time_ns <= ? "
+                "ORDER BY event_time_ns, entity_id",
+                (entity_type, time_ns),
+            ).fetchall()
+        if limit <= 0:
+            return []
+        return connection.execute(
+            "SELECT payload FROM ("
+            "SELECT event_time_ns, entity_id, payload FROM entities "
+            "WHERE entity_type = ? AND event_time_ns <= ? "
+            "ORDER BY event_time_ns DESC, entity_id DESC LIMIT ?"
+            ") ORDER BY event_time_ns, entity_id",
+            (entity_type, time_ns, limit),
+        ).fetchall()
 
     def _context(self, run_id: str) -> _RunContext:
         try:

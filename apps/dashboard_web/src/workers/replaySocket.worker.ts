@@ -62,8 +62,7 @@ scope.onmessage = event => {
 };
 
 function connect(url: string): void {
-  close(false);
-  closedByUser = false;
+  resetTransport(false, false);
   currentUrl = url;
   generation += 1;
   const localGeneration = generation;
@@ -105,6 +104,11 @@ function connect(url: string): void {
 }
 
 function ingest(message: SocketMessage): void {
+  if (message.type === "resync_required") {
+    requestResync();
+    return;
+  }
+
   if (message.type === "frame" && message.data.frame_type === "advance") {
     speed = Number(message.data.speed);
     stats.receivedFrames += 1;
@@ -118,7 +122,7 @@ function ingest(message: SocketMessage): void {
       pendingFrame.timeline.length >= MAX_PENDING_TIMELINE_ITEMS ||
       pendingFrame.bars.length >= MAX_PENDING_BARS
     ) {
-      requestResync(pendingFrame.cursor_time_ns);
+      requestResync();
       return;
     }
 
@@ -141,16 +145,19 @@ function ingest(message: SocketMessage): void {
   enqueue(message, message.type === "error");
 }
 
-function requestResync(cursorTimeNs: number): void {
-  if (resyncInProgress || socket?.readyState !== WebSocket.OPEN) return;
+function requestResync(): void {
+  if (resyncInProgress || !currentUrl) return;
+  resetTransport(false, false);
   resyncInProgress = true;
-  pendingFrame = null;
-  pendingFrameCount = 0;
   stats.pendingFrames = 0;
   stats.resyncs += 1;
   emitStatsSoon();
-  socket.send(JSON.stringify({ action: "pause" }));
-  socket.send(JSON.stringify({ action: "seek_time", value: cursorTimeNs }));
+  post({ type: "status", status: "connecting" });
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    resyncInProgress = false;
+    connect(currentUrl);
+  }, 100);
 }
 
 function scheduleFlush(): void {
@@ -215,7 +222,7 @@ function emitStatsSoon(): void {
   }, 250);
 }
 
-function close(markClosedByUser: boolean): void {
+function resetTransport(markClosedByUser: boolean, resetStats: boolean): void {
   closedByUser = markClosedByUser;
   generation += 1;
   if (reconnectTimer !== null) clearTimeout(reconnectTimer);
@@ -229,9 +236,14 @@ function close(markClosedByUser: boolean): void {
   outboundQueue = [];
   inFlight = false;
   resyncInProgress = false;
-  socket?.close();
+  const activeSocket = socket;
   socket = null;
-  stats = initialFrameSchedulerStats("worker");
+  activeSocket?.close();
+  if (resetStats) stats = initialFrameSchedulerStats("worker");
+}
+
+function close(markClosedByUser: boolean): void {
+  resetTransport(markClosedByUser, true);
 }
 
 function post(event: ReplayWorkerEvent): void {

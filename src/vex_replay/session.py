@@ -47,8 +47,8 @@ class ReplaySession:
         return self.state_frame()
 
     def set_speed(self, speed: Decimal) -> ReplayFrame:
-        if speed <= 0 or speed > Decimal("500"):
-            raise ValueError("speed must be greater than zero and at most 500")
+        if speed <= 0 or speed > Decimal("100000"):
+            raise ValueError("speed must be greater than zero and at most 100000")
         self.speed = speed
         return self.state_frame()
 

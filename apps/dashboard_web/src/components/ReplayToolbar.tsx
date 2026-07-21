@@ -22,7 +22,7 @@ interface Props {
   onSeek: (progress: number) => void;
 }
 
-const speeds = [1, 2, 5, 10, 25, 50, 100, 250];
+const speeds = [1, 2, 5, 10, 25, 50, 100, 250, 500, 2_000, 10_000, 100_000];
 
 export const ReplayToolbar = memo(function ReplayToolbar({
   playing,
@@ -51,7 +51,7 @@ export const ReplayToolbar = memo(function ReplayToolbar({
       <label className="speed-select">
         <span>Replay</span>
         <select value={speed} onChange={event => onSpeedChange(Number(event.target.value))}>
-          {speeds.map(item => <option key={item} value={item}>{item} bars/s</option>)}
+          {speeds.map(item => <option key={item} value={item}>{item === 100_000 ? "Turbo" : `${item.toLocaleString()} bars/s`}</option>)}
         </select>
       </label>
 

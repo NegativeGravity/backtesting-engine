@@ -38,6 +38,7 @@ def make_bar(
     high_ticks: int,
     low_ticks: int,
     close_ticks: int,
+    source_spread_points: int = 0,
 ) -> Bar:
     open_time = sequence * 60 * NS
     return Bar(
@@ -49,6 +50,7 @@ def make_bar(
         high_ticks=high_ticks,
         low_ticks=low_ticks,
         close_ticks=close_ticks,
+        source_spread_points=source_spread_points,
         sequence=sequence,
     )
 
@@ -513,3 +515,45 @@ def test_broker_owned_protection_cannot_be_cancelled_directly(project_root: Path
                 requested_time_ns=121 * NS,
             )
         )
+
+
+def test_historical_spread_uses_each_bars_source_spread(project_root: Path) -> None:
+    run, profile = load_models(project_root)
+    payload = run.model_dump(mode="python")
+    payload["execution"]["spread"] = {
+        "mode": "historical",
+        "fallback_points": 7,
+        "minimum_points": 1,
+        "maximum_points": 50,
+    }
+    historical_run = BacktestRunConfig.model_validate(payload)
+    broker = BrokerSimulator(historical_run, {"XAUUSD": profile})
+    broker.submit_order(make_order(historical_run, "historical_buy", Side.BUY, 60 * NS))
+
+    result = broker.process_bar(
+        make_bar(1, 260000, 260040, 259990, 260010, source_spread_points=20)
+    )
+
+    assert result.fills[0].price_ticks == 260020
+    assert result.fills[0].spread_cost > Decimal("0")
+
+
+def test_historical_spread_falls_back_for_zero_and_applies_bounds(project_root: Path) -> None:
+    run, profile = load_models(project_root)
+    payload = run.model_dump(mode="python")
+    payload["execution"]["spread"] = {
+        "mode": "historical",
+        "fallback_points": 80,
+        "use_fallback_when_zero": True,
+        "minimum_points": 5,
+        "maximum_points": 30,
+    }
+    historical_run = BacktestRunConfig.model_validate(payload)
+    broker = BrokerSimulator(historical_run, {"XAUUSD": profile})
+    broker.submit_order(make_order(historical_run, "historical_fallback", Side.BUY, 60 * NS))
+
+    result = broker.process_bar(
+        make_bar(1, 260000, 260050, 259990, 260010, source_spread_points=0)
+    )
+
+    assert result.fills[0].price_ticks == 260030

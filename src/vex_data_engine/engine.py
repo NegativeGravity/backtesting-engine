@@ -1,4 +1,7 @@
+import os
 from collections.abc import Iterable
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -57,6 +60,14 @@ def _issue_counts(issues: Iterable[DataQualityIssue]) -> tuple[int, int, int]:
     return len(values), warnings, errors
 
 
+@dataclass(frozen=True, slots=True)
+class _ImportedFile:
+    key: tuple[str, Timeframe]
+    source_sha256: str
+    report: DataFileReport
+    resolved_manifest_file: DatasetFile
+
+
 class Mt5DataEngine:
     def __init__(self, project_root: str | Path) -> None:
         self.project_root = Path(project_root).resolve()
@@ -78,113 +89,42 @@ class Mt5DataEngine:
         file_reports: dict[tuple[str, Timeframe], DataFileReport] = {}
         resolved_manifest_files: dict[tuple[str, Timeframe], DatasetFile] = {}
 
-        for manifest_file in manifest.files:
-            key = (manifest_file.symbol, manifest_file.timeframe)
-            source_path = resolved_files[key]
-            profile = symbol_profiles[manifest_file.symbol]
-            source_sha256 = sha256_file(source_path)
-            source_hashes[key] = source_sha256
-            cache_key = build_cache_key(
-                source_sha256,
-                profile,
-                config,
-                completion_watermark.isoformat(),
+        workers = self._resolve_import_workers(len(manifest.files), config)
+        if workers <= 1:
+            imported_files = tuple(
+                self._import_file(
+                    manifest,
+                    manifest_file,
+                    resolved_files[(manifest_file.symbol, manifest_file.timeframe)],
+                    symbol_profiles[manifest_file.symbol],
+                    completion_watermark,
+                    config,
+                )
+                for manifest_file in manifest.files
             )
-            parquet_path, metadata_path = artifact_paths(
-                self.project_root,
-                config,
-                manifest.dataset_id,
-                manifest.version,
-                manifest_file.symbol,
-                manifest_file.timeframe,
-            )
-            cached_artifact = self._resolve_existing_artifact(
-                config,
-                parquet_path,
-                metadata_path,
-                cache_key,
-            )
-            writer = self._create_writer(
-                cached_artifact,
-                manifest_file,
-                source_sha256,
-                cache_key,
-                parquet_path,
-                metadata_path,
-                config,
-            )
-            stream = Mt5CsvStream(
-                source_path,
-                manifest_file.symbol,
-                manifest_file.timeframe,
-                manifest.source_timezone,
-                profile,
-                completion_watermark,
-                config,
-            )
-            try:
-                for batch in stream:
-                    if writer is not None:
-                        writer.write(batch)
-                    del batch
-                summary = stream.summary()
-                issues = [*summary.issues]
-                issues.extend(
-                    self._validate_manifest_metadata(
+        else:
+            with ThreadPoolExecutor(
+                max_workers=workers,
+                thread_name_prefix="vex-data-import",
+            ) as executor:
+                futures = tuple(
+                    executor.submit(
+                        self._import_file,
+                        manifest,
                         manifest_file,
-                        source_path,
-                        source_sha256,
-                        summary,
+                        resolved_files[(manifest_file.symbol, manifest_file.timeframe)],
+                        symbol_profiles[manifest_file.symbol],
+                        completion_watermark,
+                        config,
                     )
+                    for manifest_file in manifest.files
                 )
-                _, _, error_count = _issue_counts(issues)
-                artifact = self._finalize_artifact(
-                    writer,
-                    cached_artifact,
-                    summary,
-                    error_count,
-                )
-            except Exception:
-                if writer is not None:
-                    writer.abort()
-                raise
+                imported_files = tuple(future.result() for future in futures)
 
-            actual_start, actual_end = self._actual_range(summary)
-            issue_count, warning_count, error_count = _issue_counts(issues)
-            file_reports[key] = DataFileReport(
-                symbol=manifest_file.symbol,
-                timeframe=manifest_file.timeframe,
-                source_path=source_path.relative_to(self.project_root).as_posix(),
-                delimiter="\\t" if summary.delimiter == "\t" else summary.delimiter,
-                source_row_count=summary.source_row_count,
-                output_row_count=summary.output_row_count,
-                complete_row_count=summary.complete_row_count,
-                incomplete_row_count=summary.incomplete_row_count,
-                actual_start=actual_start,
-                actual_end=actual_end,
-                duplicate_timestamp_count=summary.duplicate_timestamp_count,
-                out_of_order_count=summary.out_of_order_count,
-                gap_count=summary.gap_count,
-                estimated_missing_bars=summary.estimated_missing_bars,
-                maximum_gap_seconds=summary.maximum_gap_seconds,
-                issue_count=issue_count,
-                warning_count=warning_count,
-                error_count=error_count,
-                issues=tuple(issues),
-                artifact=artifact,
-            )
-            resolved_manifest_files[key] = manifest_file.model_copy(
-                update={
-                    "relative_path": source_path.relative_to(
-                        self.project_root / manifest.root_path
-                    ).as_posix(),
-                    "actual_start": actual_start,
-                    "actual_end": actual_end,
-                    "row_count": summary.source_row_count,
-                    "size_bytes": source_path.stat().st_size,
-                    "sha256": source_sha256,
-                }
-            )
+        for imported in imported_files:
+            source_hashes[imported.key] = imported.source_sha256
+            file_reports[imported.key] = imported.report
+            resolved_manifest_files[imported.key] = imported.resolved_manifest_file
 
         cross_reports = self._run_cross_timeframe_audits(manifest, file_reports, config)
         ordered_reports = tuple(
@@ -243,6 +183,137 @@ class Mt5DataEngine:
             report=report,
             report_path=report_path,
             resolved_manifest_path=resolved_manifest_path,
+        )
+
+    @staticmethod
+    def _resolve_import_workers(file_count: int, config: DataEngineConfig) -> int:
+        if file_count <= 1:
+            return file_count
+        if config.file_import_workers > 0:
+            return min(file_count, config.file_import_workers)
+        cpu_count = os.cpu_count() or 1
+        automatic = max(1, min(4, cpu_count // 2 or 1))
+        if not config.csv_use_threads:
+            automatic = min(automatic, 2)
+        return min(file_count, automatic)
+
+    def _import_file(
+        self,
+        manifest: DatasetManifest,
+        manifest_file: DatasetFile,
+        source_path: Path,
+        profile: SymbolProfile,
+        completion_watermark: datetime,
+        config: DataEngineConfig,
+    ) -> _ImportedFile:
+        key = (manifest_file.symbol, manifest_file.timeframe)
+        source_sha256 = sha256_file(source_path)
+        cache_key = build_cache_key(
+            source_sha256,
+            profile,
+            config,
+            completion_watermark.isoformat(),
+        )
+        parquet_path, metadata_path = artifact_paths(
+            self.project_root,
+            config,
+            manifest.dataset_id,
+            manifest.version,
+            manifest_file.symbol,
+            manifest_file.timeframe,
+        )
+        cached_artifact = self._resolve_existing_artifact(
+            config,
+            parquet_path,
+            metadata_path,
+            cache_key,
+        )
+        writer = self._create_writer(
+            cached_artifact,
+            manifest_file,
+            source_sha256,
+            cache_key,
+            parquet_path,
+            metadata_path,
+            config,
+        )
+        stream = Mt5CsvStream(
+            source_path,
+            manifest_file.symbol,
+            manifest_file.timeframe,
+            manifest.source_timezone,
+            profile,
+            completion_watermark,
+            config,
+        )
+        try:
+            for batch in stream:
+                if writer is not None:
+                    writer.write(batch)
+                del batch
+            summary = stream.summary()
+            issues = [*summary.issues]
+            issues.extend(
+                self._validate_manifest_metadata(
+                    manifest_file,
+                    source_path,
+                    source_sha256,
+                    summary,
+                )
+            )
+            _, _, error_count = _issue_counts(issues)
+            artifact = self._finalize_artifact(
+                writer,
+                cached_artifact,
+                summary,
+                error_count,
+            )
+        except Exception:
+            if writer is not None:
+                writer.abort()
+            raise
+
+        actual_start, actual_end = self._actual_range(summary)
+        issue_count, warning_count, error_count = _issue_counts(issues)
+        report = DataFileReport(
+            symbol=manifest_file.symbol,
+            timeframe=manifest_file.timeframe,
+            source_path=source_path.relative_to(self.project_root).as_posix(),
+            delimiter="\t" if summary.delimiter == "\t" else summary.delimiter,
+            source_row_count=summary.source_row_count,
+            output_row_count=summary.output_row_count,
+            complete_row_count=summary.complete_row_count,
+            incomplete_row_count=summary.incomplete_row_count,
+            actual_start=actual_start,
+            actual_end=actual_end,
+            duplicate_timestamp_count=summary.duplicate_timestamp_count,
+            out_of_order_count=summary.out_of_order_count,
+            gap_count=summary.gap_count,
+            estimated_missing_bars=summary.estimated_missing_bars,
+            maximum_gap_seconds=summary.maximum_gap_seconds,
+            issue_count=issue_count,
+            warning_count=warning_count,
+            error_count=error_count,
+            issues=tuple(issues),
+            artifact=artifact,
+        )
+        resolved_manifest_file = manifest_file.model_copy(
+            update={
+                "relative_path": source_path.relative_to(
+                    self.project_root / manifest.root_path
+                ).as_posix(),
+                "actual_start": actual_start,
+                "actual_end": actual_end,
+                "row_count": summary.source_row_count,
+                "size_bytes": source_path.stat().st_size,
+                "sha256": source_sha256,
+            }
+        )
+        return _ImportedFile(
+            key=key,
+            source_sha256=source_sha256,
+            report=report,
+            resolved_manifest_file=resolved_manifest_file,
         )
 
     def _resolve_existing_artifact(

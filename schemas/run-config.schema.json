@@ -183,7 +183,7 @@
           "$ref": "#/$defs/FixedSlippageConfig"
         },
         "spread": {
-          "$ref": "#/$defs/FixedSpreadConfig"
+          "$ref": "#/$defs/SpreadConfig"
         }
       },
       "required": [
@@ -350,6 +350,49 @@
       ],
       "title": "HigherTimeframeAccess",
       "type": "string"
+    },
+    "HistoricalSpreadConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "fallback_points": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Fallback Points",
+          "type": "integer"
+        },
+        "maximum_points": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum Points"
+        },
+        "minimum_points": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Minimum Points",
+          "type": "integer"
+        },
+        "mode": {
+          "const": "historical",
+          "default": "historical",
+          "title": "Mode",
+          "type": "string"
+        },
+        "use_fallback_when_zero": {
+          "default": true,
+          "title": "Use Fallback When Zero",
+          "type": "boolean"
+        }
+      },
+      "title": "HistoricalSpreadConfig",
+      "type": "object"
     },
     "Identifier": {
       "maxLength": 128,
@@ -657,6 +700,23 @@
       ],
       "title": "SignalExecutionPolicy",
       "type": "string"
+    },
+    "SpreadConfig": {
+      "discriminator": {
+        "mapping": {
+          "fixed": "#/$defs/FixedSpreadConfig",
+          "historical": "#/$defs/HistoricalSpreadConfig"
+        },
+        "propertyName": "mode"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/FixedSpreadConfig"
+        },
+        {
+          "$ref": "#/$defs/HistoricalSpreadConfig"
+        }
+      ]
     },
     "StrategyDefinedSizingConfig": {
       "additionalProperties": false,

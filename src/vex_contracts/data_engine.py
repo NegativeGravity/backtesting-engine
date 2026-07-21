@@ -23,6 +23,7 @@ class DataEngineConfig(ContractModel):
     csv_block_size_bytes: PositiveInt = 1048576
     csv_batch_rows: PositiveInt = 65536
     csv_use_threads: bool = False
+    file_import_workers: NonNegativeInt = 0
     max_issue_samples: PositiveInt = 100
     fail_on_warnings: bool = False
     cross_timeframe_audit: bool = True

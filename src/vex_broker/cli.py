@@ -4,8 +4,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+from vex_broker.pricing import PriceResolver
 from vex_broker.simulator import BrokerSimulator
-from vex_contracts.enums import OrderType, Side
+from vex_contracts.enums import OrderType, PriceBasis, Side
 from vex_contracts.market import Bar
 from vex_contracts.orders import OrderRequest
 from vex_contracts.run import BacktestRunConfig
@@ -66,7 +67,11 @@ def _smoke(args: argparse.Namespace) -> int:
     broker = BrokerSimulator(run, {symbol: profile})
     bars = tuple(_bar(row) for row in frame.iter_rows(named=True))
     broker.process_bar(bars[0])
-    entry_reference = bars[0].close_ticks + run.execution.spread.points
+    entry_reference = PriceResolver(
+        profile,
+        PriceBasis.BID,
+        run.execution.spread,
+    ).resolve(bars[0]).ask.close_ticks
     stop = entry_reference - 500
     target = entry_reference + 1000
     volume = broker.size_position(symbol, entry_reference, stop)

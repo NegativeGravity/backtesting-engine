@@ -13,6 +13,7 @@ from vex_analytics.engine import AnalyticsEngine
 from vex_broker.models import BrokerResult
 from vex_contracts.analytics import AnalyticsConfig, EquityCurvePoint
 from vex_contracts.broker import BrokerStateSnapshot
+from vex_contracts.enums import EventType
 from vex_contracts.market import Bar
 from vex_contracts.replay import ReplayBuildResult, ReplayBundleManifest, ReplayMetrics
 from vex_contracts.run import BacktestRunConfig
@@ -110,6 +111,30 @@ class SqliteReplayObserver(StrategyRunObserver):
                 "VALUES (?, ?, ?)",
                 (snapshot.timestamp_ns, snapshot.event_sequence, _json(account_payload)),
             )
+            state_changed = any(
+                event.event_type is not EventType.ACCOUNT_UPDATED for event in result.events
+            )
+            should_state_snapshot = (
+                self.bar_count == 1
+                or self.bar_count % self.snapshot_interval_bars == 0
+                or bool(result.trades)
+                or state_changed
+            )
+            if should_state_snapshot:
+                active_orders = tuple(
+                    order for order in snapshot.orders if order.terminal_time_ns is None
+                )
+                self.connection.execute(
+                    "INSERT OR REPLACE INTO broker_state_snapshots("
+                    "time_ns, event_sequence, orders, positions"
+                    ") VALUES (?, ?, ?, ?)",
+                    (
+                        snapshot.timestamp_ns,
+                        snapshot.event_sequence,
+                        _json(canonical_data(active_orders)),
+                        _json(canonical_data(snapshot.positions)),
+                    ),
+                )
             self._raw(
                 snapshot.timestamp_ns,
                 "account_snapshot",
@@ -481,6 +506,15 @@ class ReplayBundleBuilder:
                 event_sequence INTEGER NOT NULL,
                 payload TEXT NOT NULL
             );
+            CREATE TABLE broker_state_snapshots(
+                time_ns INTEGER NOT NULL,
+                event_sequence INTEGER NOT NULL,
+                orders TEXT NOT NULL,
+                positions TEXT NOT NULL,
+                PRIMARY KEY(time_ns, event_sequence)
+            );
+            CREATE INDEX broker_state_snapshots_time_idx
+                ON broker_state_snapshots(time_ns, event_sequence);
             CREATE TABLE equity_curve(
                 time_ns INTEGER PRIMARY KEY,
                 balance TEXT NOT NULL,
@@ -506,6 +540,13 @@ class ReplayBundleBuilder:
                 PRIMARY KEY(entity_type, entity_id)
             );
             CREATE INDEX entities_time_idx ON entities(entity_type, event_time_ns);
+            CREATE TABLE terminal_orders(
+                order_id TEXT PRIMARY KEY,
+                terminal_time_ns INTEGER NOT NULL,
+                payload TEXT NOT NULL
+            );
+            CREATE INDEX terminal_orders_time_idx
+                ON terminal_orders(terminal_time_ns, order_id);
             CREATE TABLE metadata(
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -572,24 +613,35 @@ class ReplayBundleBuilder:
 
     @staticmethod
     def _persist_entities(connection: sqlite3.Connection, runner: StrategyBacktestRunner) -> None:
-        entities = (
-            ("order", order.order_id, order.request.created_time_ns, order)
-            for order in runner.broker.orders
-        )
-        fills = (("fill", fill.fill_id, fill.time_ns, fill) for fill in runner.broker.fills)
-        trades = (
-            ("trade", trade.trade_id, trade.exit_time_ns, trade) for trade in runner.broker.trades
-        )
-        positions = (
-            ("position", position.position_id, position.opened_time_ns, position)
-            for position in runner.broker.open_positions
-        )
-        for entity_type, entity_id, time_ns, entity in (*entities, *fills, *trades, *positions):
+        def persist(entity_type: str, entity_id: str, time_ns: int, entity: object) -> str:
+            payload = _json(canonical_data(entity))
             connection.execute(
                 "INSERT OR REPLACE INTO entities(entity_type, entity_id, event_time_ns, payload) "
                 "VALUES (?, ?, ?, ?)",
-                (entity_type, entity_id, time_ns, _json(canonical_data(entity))),
+                (entity_type, entity_id, time_ns, payload),
             )
+            return payload
+
+        for order in runner.broker.orders:
+            payload = persist(
+                "order",
+                order.order_id,
+                order.request.created_time_ns,
+                order,
+            )
+            if order.terminal_time_ns is not None:
+                connection.execute(
+                    "INSERT OR REPLACE INTO terminal_orders("
+                    "order_id, terminal_time_ns, payload"
+                    ") VALUES (?, ?, ?)",
+                    (order.order_id, order.terminal_time_ns, payload),
+                )
+        for fill in runner.broker.fills:
+            persist("fill", fill.fill_id, fill.time_ns, fill)
+        for trade in runner.broker.trades:
+            persist("trade", trade.trade_id, trade.exit_time_ns, trade)
+        for position in runner.broker.open_positions:
+            persist("position", position.position_id, position.opened_time_ns, position)
         connection.commit()
 
     @staticmethod

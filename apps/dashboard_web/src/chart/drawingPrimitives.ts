@@ -132,6 +132,11 @@ export function buildDrawingPrimitives(
       continue;
     }
 
+    if (kind === "broker_trade") {
+      appendBrokerTradePrimitives(output, drawing, coordinates, tickSize, width, height);
+      continue;
+    }
+
     if (kind === "risk_reward") {
       const entryTime = Number(drawing.entry_time_ns);
       const exitTime = Number(drawing.exit_time_ns ?? entryTime + 30 * 60 * 1_000_000_000);
@@ -264,5 +269,216 @@ function rectIntersectsViewport(x: number, y: number, rectWidth: number, rectHei
 
 function clamp(value: number, minimum: number, maximum: number, fallback: number): number {
   if (!Number.isFinite(value)) return fallback;
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+
+function appendBrokerTradePrimitives(
+  output: CanvasDrawingPrimitive[],
+  drawing: Record<string, unknown>,
+  coordinates: ChartCoordinates,
+  tickSize: number,
+  width: number,
+  height: number
+): void {
+  const entryTime = Number(drawing.entry_time_ns);
+  const exitTime = Number(drawing.exit_time_ns);
+  const entryTicks = Number(drawing.entry_price_ticks);
+  const exitTicks = Number(drawing.exit_price_ticks);
+  if (![entryTime, exitTime, entryTicks, exitTicks].every(Number.isFinite)) return;
+
+  const x1 = coordinates.timeToX(entryTime);
+  const x2 = coordinates.timeToX(Math.max(entryTime, exitTime));
+  const entry = coordinates.priceToY(entryTicks * tickSize);
+  const exit = coordinates.priceToY(exitTicks * tickSize);
+  if (x1 === null || x2 === null || entry === null || exit === null) return;
+  if (![x1, x2, entry, exit].every(Number.isFinite)) return;
+
+  const x = Math.min(x1, x2);
+  const right = Math.max(x1, x2);
+  const boxWidth = Math.max(26, right - x);
+  const side = String(drawing.side ?? "long") === "short" ? "short" : "long";
+  const status = String(drawing.status ?? "closed");
+  const exitKind = String(drawing.exit_kind ?? "manual");
+  const netPnl = Number(drawing.net_pnl ?? 0);
+  const stopTicks = nullableFiniteNumber(drawing.stop_price_ticks);
+  const targetTicks = nullableFiniteNumber(drawing.target_price_ticks);
+  const stop = stopTicks === null ? null : coordinates.priceToY(stopTicks * tickSize);
+  const target = targetTicks === null ? null : coordinates.priceToY(targetTicks * tickSize);
+  const statusColor = brokerStatusColor(exitKind, netPnl);
+  const riskColor = "#ff5c73";
+  const rewardColor = "#16c79a";
+
+  if (stop !== null && Number.isFinite(stop)) {
+    const riskRect = normalizedRect(x, entry, x + boxWidth, stop);
+    if (rectIntersectsViewport(riskRect.x, riskRect.y, riskRect.width, riskRect.height, width, height)) {
+      output.push({
+        kind: "rect",
+        ...riskRect,
+        fill: riskColor,
+        fillAlpha: 0.19,
+        stroke: exitKind === "stop_loss" ? riskColor : "rgba(255, 92, 115, 0.58)",
+        strokeWidth: exitKind === "stop_loss" ? 1.5 : 0.8,
+        dash: []
+      });
+    }
+  }
+
+  if (target !== null && Number.isFinite(target)) {
+    const rewardRect = normalizedRect(x, entry, x + boxWidth, target);
+    if (rectIntersectsViewport(rewardRect.x, rewardRect.y, rewardRect.width, rewardRect.height, width, height)) {
+      output.push({
+        kind: "rect",
+        ...rewardRect,
+        fill: rewardColor,
+        fillAlpha: 0.16,
+        stroke: exitKind === "take_profit" ? rewardColor : "rgba(22, 199, 154, 0.56)",
+        strokeWidth: exitKind === "take_profit" ? 1.5 : 0.8,
+        dash: []
+      });
+    }
+  }
+
+  if (stop === null && target === null) {
+    const pnlRect = normalizedRect(x, entry, x + boxWidth, exit);
+    if (rectIntersectsViewport(pnlRect.x, pnlRect.y, pnlRect.width, pnlRect.height, width, height)) {
+      output.push({
+        kind: "rect",
+        ...pnlRect,
+        fill: statusColor,
+        fillAlpha: 0.14,
+        stroke: statusColor,
+        strokeWidth: 1,
+        dash: []
+      });
+    }
+  }
+
+  pushHorizontalLine(output, x, x + boxWidth, entry, "#4f8cff", 1.25, []);
+  if (stop !== null && Number.isFinite(stop)) {
+    pushHorizontalLine(output, x, x + boxWidth, stop, riskColor, 1, [7, 4]);
+  }
+  if (target !== null && Number.isFinite(target)) {
+    pushHorizontalLine(output, x, x + boxWidth, target, rewardColor, 1, [7, 4]);
+  }
+  pushHorizontalLine(output, Math.max(x, right - 12), right + 10, exit, statusColor, 1.8, []);
+
+  if (pointInsideViewport(right, exit, width, height)) {
+    output.push({
+      kind: "polygon",
+      points: [right, exit, right + 8, exit - 6, right + 8, exit + 6],
+      fill: statusColor
+    });
+  }
+
+  const topReference = Math.min(
+    entry,
+    target !== null && Number.isFinite(target) ? target : exit,
+    stop !== null && Number.isFinite(stop) ? stop : exit
+  );
+  const bottomReference = Math.max(
+    entry,
+    target !== null && Number.isFinite(target) ? target : exit,
+    stop !== null && Number.isFinite(stop) ? stop : exit
+  );
+  const statusLabel = `${side.toUpperCase()} · ${brokerStatusLabel(exitKind, status)} · PnL ${formatSigned(netPnl)}`;
+  output.push(labelPrimitive(x + 6, clampCoordinate(topReference + 16, 18, height - 8), statusLabel, statusColor));
+  output.push(labelPrimitive(
+    x + 6,
+    clampCoordinate(entry - 7, 18, height - 8),
+    `OPEN ${formatTimeNs(entryTime)} @ ${formatPriceTicks(entryTicks, tickSize)}`,
+    "#8db4ff"
+  ));
+
+  const exitPrefix = status === "open" ? "LIVE" : "CLOSE";
+  const closeY = clampCoordinate(exit + (exit <= entry ? -7 : 17), 18, height - 8);
+  output.push(labelPrimitive(
+    Math.max(x + 6, right - 190),
+    closeY,
+    `${exitPrefix} ${formatTimeNs(exitTime)} @ ${formatPriceTicks(exitTicks, tickSize)}`,
+    statusColor
+  ));
+
+  if (stop !== null && Number.isFinite(stop)) {
+    output.push(textPrimitive(x + boxWidth + 5, clampCoordinate(stop + 4, 18, height - 8), `SL ${formatPriceTicks(stopTicks ?? 0, tickSize)}`, riskColor));
+  }
+  if (target !== null && Number.isFinite(target)) {
+    output.push(textPrimitive(x + boxWidth + 5, clampCoordinate(target + 4, 18, height - 8), `TP ${formatPriceTicks(targetTicks ?? 0, tickSize)}`, rewardColor));
+  }
+
+  if (drawing.intrabar_ambiguous === true) {
+    output.push(labelPrimitive(
+      x + 6,
+      clampCoordinate(bottomReference + 18, 18, height - 8),
+      "INTRABAR AMBIGUOUS",
+      "#ffbf69"
+    ));
+  }
+}
+
+function pushHorizontalLine(
+  output: CanvasDrawingPrimitive[],
+  x1: number,
+  x2: number,
+  y: number,
+  color: string,
+  width: number,
+  lineDash: number[]
+): void {
+  output.push({ kind: "line", x1, y1: y, x2, y2: y, color, width, dash: lineDash });
+}
+
+function labelPrimitive(x: number, y: number, text: string, color: string): CanvasTextPrimitive {
+  return {
+    ...textPrimitive(x, y, text, color),
+    background: "rgba(6, 10, 15, 0.88)"
+  };
+}
+
+function brokerStatusLabel(exitKind: string, status: string): string {
+  if (status === "open" || exitKind === "open") return "OPEN";
+  if (exitKind === "take_profit") return "TP HIT";
+  if (exitKind === "stop_loss") return "SL HIT";
+  if (exitKind === "liquidation") return "LIQUIDATED";
+  return "CLOSED";
+}
+
+function brokerStatusColor(exitKind: string, netPnl: number): string {
+  if (exitKind === "take_profit") return "#16c79a";
+  if (exitKind === "stop_loss" || exitKind === "liquidation") return "#ff5c73";
+  if (exitKind === "open") return "#4f8cff";
+  return netPnl >= 0 ? "#16c79a" : "#ff5c73";
+}
+
+function formatSigned(value: number): string {
+  if (!Number.isFinite(value)) return "0.00";
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
+}
+
+function formatPriceTicks(value: number, tickSize: number): string {
+  const price = value * tickSize;
+  if (!Number.isFinite(price)) return "—";
+  const digits = tickSize >= 1 ? 0 : Math.min(8, Math.max(2, Math.ceil(-Math.log10(tickSize))));
+  return price.toFixed(digits);
+}
+
+function formatTimeNs(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  const date = new Date(value / 1_000_000);
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const hour = String(date.getUTCHours()).padStart(2, "0");
+  const minute = String(date.getUTCMinutes()).padStart(2, "0");
+  const second = String(date.getUTCSeconds()).padStart(2, "0");
+  return `${day}/${month} ${hour}:${minute}:${second} UTC`;
+}
+
+function nullableFiniteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function clampCoordinate(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }

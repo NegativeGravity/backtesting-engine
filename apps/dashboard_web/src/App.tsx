@@ -384,6 +384,8 @@ export default function App() {
             diagnosticsVisible={preferences.diagnosticsVisible}
             frameStats={frameStats}
             renderStream={renderStreamRef.current}
+            trades={state.trades}
+            positions={state.positions}
             onFocusToggle={() => setChartFocused(value => !value)}
           />
         </main>

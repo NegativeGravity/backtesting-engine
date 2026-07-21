@@ -39,6 +39,7 @@ export class LightweightChartsAdapter implements ChartAdapter {
   private barCount = 0;
   private lastBarTime: UTCTimestamp | null = null;
   private priceViewportSignature = "";
+  private timeViewportSignature = "";
 
   mount(container: HTMLElement): void {
     this.destroy();
@@ -92,7 +93,7 @@ export class LightweightChartsAdapter implements ChartAdapter {
         fixRightEdge: false,
         lockVisibleTimeRangeOnResize: true,
         rightBarStaysOnScroll: true,
-        shiftVisibleRangeOnNewBar: false,
+        shiftVisibleRangeOnNewBar: true,
         uniformDistribution: true,
         enableConflation: true,
         conflationThresholdFactor: 1,
@@ -144,6 +145,7 @@ export class LightweightChartsAdapter implements ChartAdapter {
     this.barCount = 0;
     this.lastBarTime = null;
     this.priceViewportSignature = "";
+    this.timeViewportSignature = "";
   }
 
   setBars(bars: ReplayBar[]): void {
@@ -255,9 +257,15 @@ export class LightweightChartsAdapter implements ChartAdapter {
       }
     }
 
-    if (settings.lockTimeScale && settings.followLatest) {
-      const range = latestLogicalRange(this.barCount, settings);
-      if (range) this.chart?.timeScale().setVisibleLogicalRange(range);
+    const timeSignature = settings.followLatest
+      ? `follow:${this.barCount}:${settings.barsVisible}:${settings.rightOffset}`
+      : `free:${settings.lockTimeScale}:${settings.barsVisible}:${settings.rightOffset}`;
+    if (timeSignature !== this.timeViewportSignature) {
+      this.timeViewportSignature = timeSignature;
+      if (settings.followLatest) {
+        const range = latestLogicalRange(this.barCount, settings);
+        if (range) this.chart?.timeScale().setVisibleLogicalRange(range);
+      }
     }
     this.queueRender();
   }

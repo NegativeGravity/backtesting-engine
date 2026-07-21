@@ -41,7 +41,7 @@ class LiveRunCreateRequest(ContractModel):
     end_time: AwareDatetime | None = None
     max_close_batches: PositiveInt | None = None
     start_paused: bool = True
-    speed_bars_per_second: Decimal = Field(default=Decimal("10"), gt=0, le=500)
+    speed_bars_per_second: Decimal = Field(default=Decimal("10"), gt=0, le=100000)
 
 
 class LiveRunControlCommand(ContractModel):

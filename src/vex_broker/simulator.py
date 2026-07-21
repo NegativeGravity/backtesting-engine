@@ -82,7 +82,7 @@ class BrokerSimulator:
             symbol: PriceResolver(
                 profile,
                 price_basis,
-                run_config.execution.spread.points,
+                run_config.execution.spread,
             )
             for symbol, profile in self.symbol_profiles.items()
         }
@@ -298,7 +298,15 @@ class BrokerSimulator:
             if decision is None:
                 continue
             fill_time_ns = bar.open_time_ns if decision.at_open else bar.close_time_ns
-            opened = self._execute_order(order, decision, fill_time_ns, fills, trades, events)
+            opened = self._execute_order(
+                order,
+                decision,
+                resolved.spread_ticks,
+                fill_time_ns,
+                fills,
+                trades,
+                events,
+            )
             if not decision.at_open:
                 intrabar_entries.update(opened)
         self._process_protections(
@@ -523,6 +531,7 @@ class BrokerSimulator:
         self,
         order: Order,
         decision: FillDecision,
+        spread_ticks: int,
         time_ns: int,
         fills: list[Fill],
         trades: list[Trade],
@@ -557,7 +566,7 @@ class BrokerSimulator:
             profile,
         )
         spread = spread_cost(
-            self._resolvers[request.symbol].spread_ticks,
+            spread_ticks,
             request.volume_lots,
             profile,
         )
@@ -1027,7 +1036,7 @@ class BrokerSimulator:
                 profile,
             )
             spread = spread_cost(
-                self._resolvers[position.symbol].spread_ticks,
+                resolved.spread_ticks,
                 position.volume_lots,
                 profile,
             )
@@ -1474,7 +1483,7 @@ class BrokerSimulator:
                 profile,
             )
             spread = spread_cost(
-                self._resolvers[position.symbol].spread_ticks,
+                position_market.spread_ticks,
                 position.volume_lots,
                 profile,
             )

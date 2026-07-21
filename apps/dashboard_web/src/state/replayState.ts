@@ -104,6 +104,22 @@ function updateBrokerState(
 
     if (typeof payload !== "object" || payload === null || Array.isArray(payload)) continue;
     const payloadRecord = payload as Record<string, unknown>;
+    if (eventType === "account.updated") {
+      const snapshotOrders = payloadRecord.orders;
+      if (Array.isArray(snapshotOrders)) {
+        orderMap.clear();
+        for (const value of normalizeOrderRecords(snapshotOrders as OrderRecord[])) {
+          orderMap.set(value.order_id, value);
+        }
+      }
+      const snapshotPositions = payloadRecord.positions;
+      if (Array.isArray(snapshotPositions)) {
+        positionMap.clear();
+        for (const value of snapshotPositions as PositionRecord[]) {
+          positionMap.set(value.position_id, value);
+        }
+      }
+    }
     if ((eventType === "position.opened" || eventType === "position.updated") && typeof payloadRecord.position_id === "string") {
       positionMap.set(payloadRecord.position_id, payloadRecord as unknown as PositionRecord);
     }

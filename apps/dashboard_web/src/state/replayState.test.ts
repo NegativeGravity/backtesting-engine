@@ -282,3 +282,52 @@ it("replaces an overlapping tail without duplicating bars", async () => {
   );
   expect(result.map(item => item.sequence)).toEqual([1, 2, 3, 4, 5]);
 });
+
+it("refreshes live orders and positions from account snapshot events", () => {
+  const initial = replayReducer(initialReplayState, {
+    type: "bootstrap_received",
+    bootstrap
+  });
+  const position = {
+    position_id: "position-1",
+    symbol: "XAUUSD",
+    side: "long",
+    status: "open",
+    volume_lots: "0.10",
+    average_entry_price_ticks: "250000",
+    opened_time_ns: 100,
+    current_price_ticks: 250125,
+    stop_loss_ticks: 249900,
+    take_profit_ticks: 250300,
+    realized_pnl: "0",
+    unrealized_pnl: "12.5"
+  } as const;
+  const frame = {
+    frame_type: "advance",
+    cursor_sequence: 3,
+    cursor_time_ns: 300,
+    progress: "0.3",
+    playing: true,
+    speed: "100",
+    bars: [],
+    timeline: [{
+      sequence: 11,
+      time_ns: 300,
+      kind: "broker_event",
+      payload: {
+        event_type: "account.updated",
+        payload: {
+          orders: [],
+          positions: [position]
+        }
+      }
+    }],
+    account: null
+  } satisfies ReplayFrame;
+
+  const state = replayReducer(initial, { type: "frame_received", frame });
+
+  expect(state.positions).toHaveLength(1);
+  expect(state.positions[0]?.current_price_ticks).toBe(250125);
+  expect(state.positions[0]?.unrealized_pnl).toBe("12.5");
+});

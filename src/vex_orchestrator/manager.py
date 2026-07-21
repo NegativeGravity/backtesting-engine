@@ -5,10 +5,10 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
+from itertools import islice
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -36,6 +36,7 @@ from vex_orchestrator.models import (
     LiveRunCreateRequest,
     LiveRunState,
 )
+from vex_orchestrator.pacing import DeadlinePacer, ui_publish_interval
 from vex_replay.builder import ReplayBundleBuilder
 from vex_replay.repository import ReplayRunRepository
 from vex_strategy.output import StrategyOutputRecorder
@@ -48,6 +49,17 @@ class _Subscriber:
     queue: asyncio.Queue[dict[str, Any]]
     symbol: str
     timeframe: Timeframe
+    dropped_messages: int = 0
+
+
+LIVE_ACCOUNT_TIMELINE_INTERVAL = 250
+LIVE_BOOTSTRAP_BAR_LIMIT = 1_000
+LIVE_BOOTSTRAP_ENTITY_LIMIT = 5_000
+LIVE_BOOTSTRAP_TIMELINE_LIMIT = 5_000
+LIVE_MAX_INCREMENTAL_BARS_PER_FRAME = 1_200
+LIVE_VISUAL_RESET_WINDOW = 1_000
+LIVE_SUBSCRIBER_QUEUE_SIZE = 512
+MAX_LIVE_REPLAY_SPEED = Decimal("100000")
 
 
 class LiveRunNotFoundError(KeyError):
@@ -102,6 +114,12 @@ class LiveBacktestJob:
         self._processed_close_batches = 0
         self._processed_execution_bars = 0
         self._last_report = None
+        self._pending_bars: list[Bar] = []
+        self._pending_bar_reset = False
+        self._recent_bars: dict[tuple[str, Timeframe], deque[Bar]] = {}
+        self._pending_timeline: list[ReplayTimelineItem] = []
+        self._pending_result: StrategyStepResult | None = None
+        self._last_publish_monotonic = 0.0
         self._write_inputs()
         self._replace_session()
 
@@ -113,6 +131,7 @@ class LiveBacktestJob:
             return self._state_unlocked()
 
     def control(self, command: LiveRunControlCommand) -> LiveRunState:
+        publish_state = command.action in {"pause", "step_forward", "set_speed"}
         with self._condition:
             if self._status in {"finalizing", "completed", "failed", "cancelled"}:
                 raise ValueError(
@@ -155,15 +174,20 @@ class LiveBacktestJob:
                 if command.value is None:
                     raise ValueError("set_speed requires a value")
                 speed = Decimal(str(command.value))
-                if speed <= 0 or speed > 500:
-                    raise ValueError("speed must be greater than zero and at most 500")
+                if speed <= 0 or speed > MAX_LIVE_REPLAY_SPEED:
+                    raise ValueError(
+                        f"speed must be greater than zero and at most {MAX_LIVE_REPLAY_SPEED}"
+                    )
                 self._speed = speed
             elif command.action == "cancel":
                 self._cancel_requested = True
                 self._playing = False
             self._touch_unlocked()
             self._condition.notify_all()
-            return self._state_unlocked()
+            state = self._state_unlocked()
+        if publish_state:
+            self._publish_state()
+        return state
 
     def subscribe(
         self,
@@ -176,7 +200,7 @@ class LiveBacktestJob:
         self._validate_view(selected_symbol, selected_timeframe)
         subscriber = _Subscriber(
             loop,
-            asyncio.Queue(maxsize=2000),
+            asyncio.Queue(maxsize=LIVE_SUBSCRIBER_QUEUE_SIZE),
             selected_symbol,
             selected_timeframe,
         )
@@ -251,6 +275,8 @@ class LiveBacktestJob:
             )
 
     def _run_loop(self) -> None:
+        pacer = DeadlinePacer()
+        previous_speed: Decimal | None = None
         try:
             self._status = "starting"
             self._touch()
@@ -294,8 +320,21 @@ class LiveBacktestJob:
                 if result.completed:
                     self._complete()
                     return
-                if self._playing:
-                    time.sleep(max(0.0, 1.0 / float(self._speed)))
+                with self._condition:
+                    playing = self._playing
+                    speed = self._speed
+                if playing:
+                    if previous_speed != speed:
+                        pacer.reset()
+                        previous_speed = speed
+                    delay = pacer.delay(float(speed))
+                    if delay > 0:
+                        with self._condition:
+                            if self._playing and not self._cancel_requested:
+                                self._condition.wait(timeout=delay)
+                else:
+                    pacer.reset()
+                    previous_speed = None
             cancel_result = self._require_session().finish("cancelled")
             self._apply_result(cancel_result)
             with self._condition:
@@ -320,6 +359,8 @@ class LiveBacktestJob:
         if session is not None and not session.finished:
             session.terminate()
         self._timeline.clear()
+        self._recent_bars.clear()
+        self._clear_pending_publish()
         self._timeline_sequence = 0
         self._processed_close_batches = 0
         self._processed_execution_bars = 0
@@ -399,11 +440,12 @@ class LiveBacktestJob:
                 self._last_report = result.report
             items = self._timeline_items(result)
             self._timeline.extend(items)
+            self._remember_recent_bars(result.bars)
             self._touch_unlocked()
         if broadcast_bootstrap:
             self._publish_bootstrap()
         elif broadcast:
-            self._publish_result(result, items)
+            self._queue_result_for_publish(result, items)
 
     def _timeline_items(self, result: StrategyStepResult) -> tuple[ReplayTimelineItem, ...]:
         raw: list[tuple[int, int, int, dict[str, JsonValue], str]] = []
@@ -452,17 +494,23 @@ class LiveBacktestJob:
                     "broker_event",
                 )
             )
-        source += 1
-        account = result.broker_snapshot.account
-        raw.append(
-            (
-                result.event_time_ns,
-                50,
-                source,
-                cast(dict[str, JsonValue], account.model_dump(mode="json")),
-                "account_snapshot",
-            )
+        include_account_timeline = (
+            result.completed
+            or result.processed_close_batches <= 1
+            or result.processed_close_batches % LIVE_ACCOUNT_TIMELINE_INTERVAL == 0
         )
+        if include_account_timeline:
+            source += 1
+            account = result.broker_snapshot.account
+            raw.append(
+                (
+                    result.event_time_ns,
+                    50,
+                    source,
+                    cast(dict[str, JsonValue], account.model_dump(mode="json")),
+                    "account_snapshot",
+                )
+            )
         items: list[ReplayTimelineItem] = []
         for time_ns, priority, source_sequence, payload, kind in sorted(raw):
             del priority, source_sequence
@@ -486,34 +534,112 @@ class LiveBacktestJob:
             )
         return tuple(items)
 
-    def _publish_result(
+    def _queue_result_for_publish(
         self,
         result: StrategyStepResult,
         items: tuple[ReplayTimelineItem, ...],
     ) -> None:
+        now = time.monotonic()
         with self._condition:
+            if not self._pending_bar_reset:
+                self._pending_bars.extend(result.bars)
+                if len(self._pending_bars) > LIVE_MAX_INCREMENTAL_BARS_PER_FRAME:
+                    self._pending_bars.clear()
+                    self._pending_bar_reset = True
+            self._pending_timeline.extend(items)
+            self._pending_result = result
+            force = result.completed or not self._playing
+            due = now - self._last_publish_monotonic >= ui_publish_interval(float(self._speed))
+        if force or due:
+            self._flush_pending_publish(now)
+
+    def _flush_pending_publish(self, now: float | None = None) -> None:
+        with self._condition:
+            result = self._pending_result
+            if result is None:
+                return
+            bars = self._deduplicate_pending_bars(self._pending_bars)
+            bar_reset = self._pending_bar_reset
+            items = tuple(self._pending_timeline)
+            self._pending_bars.clear()
+            self._pending_bar_reset = False
+            self._pending_timeline.clear()
+            self._pending_result = None
+            self._last_publish_monotonic = time.monotonic() if now is None else now
             subscribers = tuple(self._subscribers)
+            recent_bars = (
+                {key: tuple(value) for key, value in self._recent_bars.items()}
+                if bar_reset
+                else {}
+            )
             state = self._state_unlocked()
         for subscriber in subscribers:
-            bars = tuple(
-                self._replay_bar(bar)
-                for bar in result.bars
-                if bar.symbol == subscriber.symbol and bar.timeframe is subscriber.timeframe
+            if bar_reset:
+                selected_source = recent_bars.get(
+                    (subscriber.symbol, subscriber.timeframe),
+                    (),
+                )
+            else:
+                selected_source = tuple(
+                    bar
+                    for bar in bars
+                    if bar.symbol == subscriber.symbol and bar.timeframe is subscriber.timeframe
+                )
+            selected_bars = tuple(self._replay_bar(bar) for bar in selected_source)
+            frame_type = (
+                "reset"
+                if bar_reset
+                else "completed"
+                if result.completed
+                else "advance"
             )
             frame = ReplayFrame(
-                frame_type="completed" if result.completed else "advance",
+                frame_type=frame_type,
                 cursor_sequence=result.processed_execution_bars,
                 cursor_time_ns=result.event_time_ns,
                 progress=state.progress,
                 playing=state.playing,
                 speed=state.speed_bars_per_second,
-                bars=bars,
+                bars=selected_bars,
                 timeline=items,
                 account=result.broker_snapshot.account,
             )
             self._enqueue(subscriber, {"type": "frame", "data": frame.model_dump(mode="json")})
 
+    def _clear_pending_publish(self) -> None:
+        with self._condition:
+            self._pending_bars.clear()
+            self._pending_bar_reset = False
+            self._pending_timeline.clear()
+            self._pending_result = None
+            self._last_publish_monotonic = time.monotonic()
+
+    def _remember_recent_bars(self, bars: tuple[Bar, ...]) -> None:
+        for bar in bars:
+            key = (bar.symbol, bar.timeframe)
+            recent = self._recent_bars.get(key)
+            if recent is None:
+                recent = deque(maxlen=LIVE_VISUAL_RESET_WINDOW)
+                self._recent_bars[key] = recent
+            if recent and recent[-1].sequence == bar.sequence:
+                recent[-1] = bar
+            elif not recent or recent[-1].sequence < bar.sequence:
+                recent.append(bar)
+
+    @staticmethod
+    def _deduplicate_pending_bars(bars: list[Bar]) -> tuple[Bar, ...]:
+        unique: dict[tuple[str, Timeframe, int], Bar] = {}
+        for bar in bars:
+            unique[(bar.symbol, bar.timeframe, bar.sequence)] = bar
+        return tuple(
+            sorted(
+                unique.values(),
+                key=lambda bar: (bar.close_time_ns, bar.symbol, bar.timeframe.value, bar.sequence),
+            )
+        )
+
     def _publish_bootstrap(self) -> None:
+        self._clear_pending_publish()
         with self._condition:
             subscribers = tuple(self._subscribers)
             payloads = tuple(
@@ -527,6 +653,7 @@ class LiveBacktestJob:
             )
 
     def _publish_state(self) -> None:
+        self._flush_pending_publish()
         with self._condition:
             subscribers = tuple(self._subscribers)
             state = self._state_unlocked()
@@ -553,8 +680,22 @@ class LiveBacktestJob:
     def _enqueue(subscriber: _Subscriber, message: dict[str, Any]) -> None:
         def put() -> None:
             if subscriber.queue.full():
-                with suppress(asyncio.QueueEmpty):
-                    subscriber.queue.get_nowait()
+                dropped = 0
+                while True:
+                    try:
+                        subscriber.queue.get_nowait()
+                        dropped += 1
+                    except asyncio.QueueEmpty:
+                        break
+                subscriber.dropped_messages += dropped
+                subscriber.queue.put_nowait(
+                    {
+                        "type": "resync_required",
+                        "detail": "subscriber queue overflowed; reconnect for a fresh bootstrap",
+                        "dropped_messages": subscriber.dropped_messages,
+                    }
+                )
+                return
             subscriber.queue.put_nowait(message)
 
         subscriber.loop.call_soon_threadsafe(put)
@@ -562,7 +703,12 @@ class LiveBacktestJob:
     def _bootstrap_unlocked(self, symbol: str, timeframe: Timeframe) -> ReplayBootstrap:
         session = self._require_session()
         profile = self.profiles[symbol]
-        frame = self.store.window(symbol, timeframe, self._current_time_ns, 500)
+        frame = self.store.window(
+            symbol,
+            timeframe,
+            self._current_time_ns,
+            LIVE_BOOTSTRAP_BAR_LIMIT,
+        )
         bars = tuple(
             self._replay_bar_from_row(cast(dict[str, object], row), profile.trade_tick_size)
             for row in frame.iter_rows(named=True)
@@ -579,12 +725,18 @@ class LiveBacktestJob:
             price_digits=profile.digits,
             price_tick_size=profile.trade_tick_size,
             bars=bars,
-            timeline=tuple(self._timeline),
+            timeline=tuple(
+                islice(
+                    self._timeline,
+                    max(0, len(self._timeline) - LIVE_BOOTSTRAP_TIMELINE_LIMIT),
+                    None,
+                )
+            ),
             account=broker.state_snapshot.account,
-            orders=broker.orders,
+            orders=broker.orders[-LIVE_BOOTSTRAP_ENTITY_LIMIT:],
             positions=broker.open_positions,
-            fills=broker.fills,
-            trades=broker.trades,
+            fills=broker.fills[-LIVE_BOOTSTRAP_ENTITY_LIMIT:],
+            trades=broker.trades[-LIVE_BOOTSTRAP_ENTITY_LIMIT:],
             strategy_report=report,
             broker_report=report.broker_report,
         )

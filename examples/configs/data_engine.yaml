@@ -8,6 +8,7 @@ row_group_size: 131072
 csv_block_size_bytes: 1048576
 csv_batch_rows: 65536
 csv_use_threads: false
+file_import_workers: 0
 max_issue_samples: 100
 fail_on_warnings: false
 cross_timeframe_audit: true

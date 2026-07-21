@@ -22,6 +22,26 @@ class FixedSpreadConfig(ContractModel):
     points: NonNegativeInt
 
 
+class HistoricalSpreadConfig(ContractModel):
+    mode: Literal[SpreadMode.HISTORICAL] = SpreadMode.HISTORICAL
+    fallback_points: NonNegativeInt = 0
+    use_fallback_when_zero: bool = True
+    minimum_points: NonNegativeInt = 0
+    maximum_points: NonNegativeInt | None = None
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "HistoricalSpreadConfig":
+        if self.maximum_points is not None and self.maximum_points < self.minimum_points:
+            raise ValueError("maximum_points must be greater than or equal to minimum_points")
+        return self
+
+
+type SpreadConfig = Annotated[
+    FixedSpreadConfig | HistoricalSpreadConfig,
+    Field(discriminator="mode"),
+]
+
+
 class NoCommissionConfig(ContractModel):
     mode: Literal[CommissionMode.NONE] = CommissionMode.NONE
 
@@ -94,15 +114,13 @@ class ExecutionConfig(ContractModel):
     )
     intrabar_policy: IntrabarPolicy = IntrabarPolicy.CONSERVATIVE
     gap_policy: GapPolicy = GapPolicy.MARKETABLE_OPEN
-    spread: FixedSpreadConfig
+    spread: SpreadConfig
     commission: CommissionConfig
     slippage: FixedSlippageConfig = Field(default_factory=FixedSlippageConfig)
     allow_same_bar_exit_after_open_fill: bool = True
 
     @model_validator(mode="after")
     def validate_supported_modes(self) -> "ExecutionConfig":
-        if self.spread.mode is not SpreadMode.FIXED:
-            raise ValueError("only fixed spread is supported in the current contract version")
         if self.slippage.mode is not SlippageMode.FIXED:
             raise ValueError("only fixed slippage is supported in the current contract version")
         return self

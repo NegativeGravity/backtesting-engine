@@ -194,6 +194,7 @@ export interface ReplayFrame {
 export type SocketMessage =
   | { type: "bootstrap"; data: ReplayBootstrap }
   | { type: "frame"; data: ReplayFrame }
+  | { type: "resync_required"; detail: string; dropped_messages: number }
   | { type: "error"; detail: string };
 
 export interface ReplayControlCommand {

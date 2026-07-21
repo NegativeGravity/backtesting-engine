@@ -82,7 +82,7 @@ export function LiveBacktestLauncher({ onRunCreated }: Props) {
         <div className="live-form-grid">
           <label className="live-field"><span>Strategy package</span><select value={strategyId} onChange={event => setStrategyId(event.target.value)}>{catalog?.strategies.map(item => <option key={item.package_id} value={item.package_id}>{item.name} · {item.version}</option>)}</select></label>
           <label className="live-field"><span>Maximum close batches</span><input type="number" min="1" value={maxBatches} onChange={event => setMaxBatches(Math.max(1, Number(event.target.value)))} /></label>
-          <label className="live-field"><span>Bars per second</span><input type="number" min="1" max="500" value={speed} onChange={event => setSpeed(Math.min(500, Math.max(1, Number(event.target.value))))} /></label>
+          <label className="live-field"><span>Bars per second</span><input type="number" min="1" max="100000" value={speed} onChange={event => setSpeed(Math.min(100000, Math.max(1, Number(event.target.value))))} /></label>
           <label className="live-check"><input type="checkbox" checked={startPaused} onChange={event => setStartPaused(event.target.checked)} /><span>Start paused for manual candle stepping</span></label>
         </div>
         {selected ? <div className="strategy-summary"><strong>{selected.name}</strong><span>{selected.description}</span><code>{selected.entrypoint}</code></div> : null}

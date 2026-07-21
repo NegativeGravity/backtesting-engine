@@ -44,6 +44,26 @@ The 1.2 dashboard is a bounded, incremental replay workstation designed for long
 
 See `docs/dashboard-performance-architecture.md` and `docs/VEX-1.2.0-DASHBOARD-PRO-RUNBOOK-FA.md`.
 
+## Performance and execution upgrade
+
+The current implementation also includes:
+
+- deadline-based replay pacing up to 100,000 close batches per second
+- adaptive engine-to-browser frame coalescing at approximately 8–30 updates per second
+- bounded visual reset frames when high-speed replay would otherwise produce oversized candle payloads
+- bounded live bootstrap and timeline memory
+- explicit WebSocket overflow detection with authoritative bootstrap resynchronization
+- concurrent imports across independent symbol/timeframe files
+- historical per-bar MT5 spread with deterministic tick rounding and bounds
+- replay broker-state checkpoints and indexed terminal-order reconstruction
+- persistent read-only SQLite query connections with cache and memory mapping
+- broker-derived TradingView-style trade boxes with open/close time, SL/TP, PnL, and TP/SL hit status
+- follow-latest time scaling that preserves the configured visible range while price remains auto-scaled
+
+Implementation details and remaining high-cost upgrades are documented in
+`docs/PERFORMANCE_ARCHITECTURE_V2.md`. The Persian implementation report is in
+`docs/IMPLEMENTATION_REPORT_FA.md`.
+
 ## Core guarantees
 
 - One `step_forward` processes exactly one synchronized closed-candle batch.

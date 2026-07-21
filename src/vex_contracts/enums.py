@@ -84,6 +84,7 @@ class CommissionMode(StrEnum):
 
 class SpreadMode(StrEnum):
     FIXED = "fixed"
+    HISTORICAL = "historical"
 
 
 class SlippageMode(StrEnum):

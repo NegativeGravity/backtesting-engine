@@ -22,6 +22,10 @@ import {
 import { LightweightChartsAdapter } from "../chart/LightweightChartsAdapter";
 import { ReplayBarBuffer } from "../chart/ReplayBarBuffer";
 import {
+  brokerTradeIds,
+  buildBrokerTradeDrawings
+} from "../chart/brokerTradeDrawings";
+import {
   applyChartCommandsMutable,
   cloneChartState,
   materializeChartState,
@@ -38,7 +42,13 @@ import {
 import { formatNumber } from "../lib/format";
 import type { FrameSchedulerStats } from "../lib/frameScheduler";
 import type { ReplayRenderStream } from "../lib/replayRenderStream";
-import type { ReplayBar, ReplayBootstrap, ReplayFrame } from "../lib/types";
+import type {
+  PositionRecord,
+  ReplayBar,
+  ReplayBootstrap,
+  ReplayFrame,
+  TradeRecord
+} from "../lib/types";
 import {
   DrawingCanvasOverlay,
   type DrawingCanvasController
@@ -54,6 +64,8 @@ interface Props {
   diagnosticsVisible: boolean;
   frameStats: FrameSchedulerStats;
   renderStream: ReplayRenderStream;
+  trades: TradeRecord[];
+  positions: PositionRecord[];
   onFocusToggle: () => void;
 }
 
@@ -89,6 +101,8 @@ export const TradingChart = memo(function TradingChart({
   diagnosticsVisible,
   frameStats,
   renderStream,
+  trades,
+  positions,
   onFocusToggle
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -104,6 +118,9 @@ export const TradingChart = memo(function TradingChart({
   const recoveriesRef = useRef<number[]>([]);
   const recoveryTimerRef = useRef<number | null>(null);
   const activeIdentityRef = useRef(`${symbol}:${timeframe}`);
+  const brokerDrawingsRef = useRef<DrawingState[]>([]);
+  const tradesRef = useRef(trades);
+  const positionsRef = useRef(positions);
 
   const [adapter, setAdapter] = useState<LightweightChartsAdapter | null>(null);
   const [adapterGeneration, setAdapterGeneration] = useState(0);
@@ -124,11 +141,30 @@ export const TradingChart = memo(function TradingChart({
   indicatorsVisibleRef.current = indicatorsVisible;
   viewportRef.current = viewport;
   activeIdentityRef.current = `${symbol}:${timeframe}`;
+  tradesRef.current = trades;
+  positionsRef.current = positions;
 
-  const getDrawings = useCallback(
-    (): Iterable<DrawingState> => chartModelRef.current.drawings.values(),
-    []
-  );
+  const getDrawings = useCallback(function* (): Iterable<DrawingState> {
+    const brokerDrawings = brokerDrawingsRef.current;
+    const representedTradeIds = brokerTradeIds(brokerDrawings);
+    for (const drawing of chartModelRef.current.drawings.values()) {
+      const payload = drawing.payload;
+      const isSupersededTradeBox =
+        payload.kind === "risk_reward" &&
+        representedTradeIds.has(String(payload.trade_id ?? ""));
+      if (!isSupersededTradeBox) yield drawing;
+    }
+    yield* brokerDrawings;
+  }, []);
+
+  const refreshBrokerDrawings = useCallback(() => {
+    brokerDrawingsRef.current = buildBrokerTradeDrawings({
+      symbol,
+      trades: tradesRef.current,
+      positions: positionsRef.current,
+      latestTimeNs: barBufferRef.current.last?.close_time_ns ?? null
+    });
+  }, [symbol]);
 
   const scheduleHudRefresh = useCallback((immediate = false) => {
     if (immediate) {
@@ -212,6 +248,7 @@ export const TradingChart = memo(function TradingChart({
   const applyAdvanceFrame = useCallback((frame: ReplayFrame) => {
     const appendResult = barBufferRef.current.append(frame.bars);
     const mutation = applyChartCommandsMutable(chartModelRef.current, frame.timeline);
+    refreshBrokerDrawings();
 
     runChartOperation("apply replay frame", () => {
       const currentAdapter = adapterRef.current;
@@ -252,7 +289,30 @@ export const TradingChart = memo(function TradingChart({
       overlayRef.current?.invalidate();
     }
     scheduleHudRefresh();
-  }, [runChartOperation, scheduleHudRefresh, tickSize]);
+  }, [refreshBrokerDrawings, runChartOperation, scheduleHudRefresh, tickSize]);
+
+  const applyResetFrame = useCallback((frame: ReplayFrame) => {
+    barBufferRef.current.replace(frame.bars);
+    applyChartCommandsMutable(chartModelRef.current, frame.timeline);
+    appendedSinceCompactionRef.current = 0;
+    refreshBrokerDrawings();
+
+    runChartOperation("apply visual reset", () => {
+      const currentAdapter = adapterRef.current;
+      if (!currentAdapter) return;
+      currentAdapter.setBars(barBufferRef.current.toArray());
+      currentAdapter.setStrategyState(
+        indicatorsVisibleRef.current
+          ? chartModelRef.current
+          : withoutIndicatorSeries(chartModelRef.current),
+        tickSize
+      );
+      currentAdapter.applyViewport(viewportRef.current);
+    });
+
+    overlayRef.current?.invalidate();
+    scheduleHudRefresh(true);
+  }, [refreshBrokerDrawings, runChartOperation, scheduleHudRefresh, tickSize]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -305,12 +365,20 @@ export const TradingChart = memo(function TradingChart({
         resetFromBootstrap(message.data);
         return;
       }
-      if (message.type === "frame" && message.data.frame_type === "advance") {
+      if (message.type !== "frame") return;
+      if (message.data.frame_type === "reset") {
+        applyResetFrame(message.data);
+        return;
+      }
+      if (
+        message.data.frame_type === "advance" ||
+        message.data.frame_type === "completed"
+      ) {
         applyAdvanceFrame(message.data);
       }
     });
     return unsubscribe;
-  }, [applyAdvanceFrame, renderStream, resetFromBootstrap]);
+  }, [applyAdvanceFrame, applyResetFrame, renderStream, resetFromBootstrap]);
 
   useEffect(() => {
     const nextIdentity = `${symbol}:${timeframe}`;
@@ -335,6 +403,13 @@ export const TradingChart = memo(function TradingChart({
     overlayRef.current?.invalidate();
     scheduleHudRefresh(true);
   }, [symbol, timeframe, tickSize, runChartOperation, scheduleHudRefresh]);
+
+
+  useEffect(() => {
+    refreshBrokerDrawings();
+    overlayRef.current?.invalidate();
+    scheduleHudRefresh();
+  }, [positions, refreshBrokerDrawings, scheduleHudRefresh, trades]);
 
   useEffect(() => {
     if (!diagnosticsVisible) {

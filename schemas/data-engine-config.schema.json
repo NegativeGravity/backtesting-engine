@@ -117,6 +117,12 @@
       "title": "Fail On Warnings",
       "type": "boolean"
     },
+    "file_import_workers": {
+      "default": 0,
+      "minimum": 0,
+      "title": "File Import Workers",
+      "type": "integer"
+    },
     "max_issue_samples": {
       "default": 100,
       "exclusiveMinimum": 0,
