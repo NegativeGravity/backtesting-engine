@@ -1,9 +1,22 @@
+from collections import defaultdict
 from collections.abc import Iterable
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import cast
 
 from pydantic import BaseModel, JsonValue
 
+from vex_broker.advanced_orders import (
+    OCO_POLICY_CANCEL_ALL,
+    STOP_AND_REVERSE_CHAIN_ID_TAG,
+    entry_reevaluate_after_flat,
+    entry_requires_flat,
+    execution_risk_reward_instruction,
+    intrabar_entry_target_allowed,
+    oco_ambiguous_policy,
+    oco_group,
+    stop_and_reverse_instruction,
+    validate_advanced_order_tags,
+)
 from vex_broker.calculations import (
     commission_cost,
     money_for_ticks,
@@ -279,6 +292,100 @@ class BrokerSimulator:
         events.append(self._emit(EventType.POSITION_UPDATED, requested_time_ns, contract))
         return self._result(events=events)
 
+    def close_all_positions(
+        self,
+        time_ns: int,
+        reason: str = "end_of_data",
+    ) -> BrokerResult:
+        if not self.state.positions:
+            return BrokerResult.empty()
+        events: list[EventEnvelope[dict[str, JsonValue]]] = []
+        fills: list[Fill] = []
+        trades: list[Trade] = []
+        for position_id in tuple(sorted(self.state.positions)):
+            position = self.state.positions.get(position_id)
+            if position is None:
+                continue
+            resolved = self._last_resolved.get(position.symbol)
+            if resolved is None:
+                raise BrokerConfigurationError(
+                    f"cannot close {position.position_id} without a resolved market price"
+                )
+            exit_side = Side.SELL if position.side == PositionSide.LONG.value else Side.BUY
+            side_bar = resolved.bid if exit_side is Side.SELL else resolved.ask
+            base = side_bar.close_ticks
+            slip_ticks = points_to_ticks(
+                self.run_config.execution.slippage.market_order_points,
+                self.symbol_profiles[position.symbol],
+            )
+            actual = base - slip_ticks if exit_side is Side.SELL else base + slip_ticks
+            profile = self.symbol_profiles[position.symbol]
+            commission = commission_cost(
+                self.run_config.execution.commission,
+                exit_side,
+                position.volume_lots,
+                actual,
+                profile,
+            )
+            spread = spread_cost(resolved.spread_ticks, position.volume_lots, profile)
+            slippage = slippage_cost(slip_ticks, position.volume_lots, profile)
+            exit_order = self._create_synthetic_exit_order(
+                position,
+                time_ns,
+                reason,
+                events,
+            )
+            fill = Fill(
+                fill_id=self._ids.next("fill"),
+                order_id=exit_order.order_id,
+                run_id=position.run_id,
+                symbol=position.symbol,
+                side=exit_side,
+                time_ns=time_ns,
+                price_ticks=actual,
+                volume_lots=position.volume_lots,
+                commission=commission,
+                spread_cost=spread,
+                slippage_cost=slippage,
+            )
+            filled_order = apply_fill(exit_order, fill)
+            self.state.orders[filled_order.order_id] = filled_order
+            self.state.account.balance -= commission
+            self.state.fills.append(fill)
+            fills.append(fill)
+            events.append(
+                self._emit(
+                    EventType.ORDER_FILLED,
+                    time_ns,
+                    fill,
+                    extra={"fill_reason": reason},
+                )
+            )
+            self._close_position(
+                position,
+                position.volume_lots,
+                actual,
+                time_ns,
+                fill.order_id,
+                commission,
+                spread,
+                slippage,
+                reason,
+                False,
+                trades,
+                events,
+            )
+        self._revalue_account(time_ns)
+        self.state.current_time_ns = time_ns
+        snapshot = self._snapshot(time_ns, self._events.sequence + 1)
+        events.append(self._emit(EventType.ACCOUNT_UPDATED, time_ns, snapshot))
+        return self._result(
+            events=events,
+            fills=fills,
+            trades=trades,
+            snapshot=snapshot,
+        )
+
     def process_bar(self, bar: Bar) -> BrokerResult:
         self._validate_bar_sequence(bar)
         self._require_profile(bar.symbol)
@@ -289,27 +396,21 @@ class BrokerSimulator:
         fills: list[Fill] = []
         trades: list[Trade] = []
         preexisting = set(self.state.positions)
+        had_open_symbol_position = self._has_open_symbol_position(bar.symbol)
         intrabar_entries: set[str] = set()
         self.state.current_time_ns = bar.open_time_ns
         self._expire_orders(bar, events)
         self._activate_orders(bar, events)
-        for order in self._active_orders(bar.symbol):
-            decision = self._order_fill_decision(order, resolved)
-            if decision is None:
-                continue
-            fill_time_ns = bar.open_time_ns if decision.at_open else bar.close_time_ns
-            opened = self._execute_order(
-                order,
-                decision,
-                resolved.spread_ticks,
-                fill_time_ns,
+        intrabar_entries.update(
+            self._process_active_entry_orders(
+                bar,
+                resolved,
                 fills,
                 trades,
                 events,
             )
-            if not decision.at_open:
-                intrabar_entries.update(opened)
-        self._process_protections(
+        )
+        deferred_extrema = self._process_protections(
             bar,
             resolved,
             preexisting,
@@ -318,7 +419,30 @@ class BrokerSimulator:
             trades,
             events,
         )
-        self._update_positions_for_bar(bar, resolved)
+        if had_open_symbol_position and not self._has_open_symbol_position(bar.symbol):
+            self._revalue_account(bar.close_time_ns, resolved)
+            post_exit_preexisting = set(self.state.positions)
+            post_exit_intrabar_entries = self._process_active_entry_orders(
+                bar,
+                resolved,
+                fills,
+                trades,
+                events,
+                reevaluate_after_flat_only=True,
+                fill_time_override_ns=bar.close_time_ns,
+            )
+            deferred_extrema.update(
+                self._process_protections(
+                    bar,
+                    resolved,
+                    post_exit_preexisting,
+                    post_exit_intrabar_entries,
+                    fills,
+                    trades,
+                    events,
+                )
+            )
+        self._update_positions_for_bar(bar, resolved, deferred_extrema)
         self._revalue_account(bar.close_time_ns, resolved)
         self._process_margin_state(bar, resolved, fills, trades, events)
         self._apply_negative_balance_protection(bar.close_time_ns, resolved)
@@ -368,6 +492,7 @@ class BrokerSimulator:
             if profile.normalize_volume(request.volume_lots) != request.volume_lots:
                 return "volume_not_aligned"
             self._validate_pending_protection(request)
+            validate_advanced_order_tags(request)
         except ValueError as exc:
             return str(exc).replace(" ", "_")
         if request.reduce_only:
@@ -474,6 +599,138 @@ class BrokerSimulator:
             if self.state.orders[key].status in statuses
         )
 
+    def _process_active_entry_orders(
+        self,
+        bar: Bar,
+        resolved: ResolvedBar,
+        fills: list[Fill],
+        trades: list[Trade],
+        events: list[EventEnvelope[dict[str, JsonValue]]],
+        *,
+        reevaluate_after_flat_only: bool = False,
+        fill_time_override_ns: int | None = None,
+    ) -> set[str]:
+        intrabar_entries: set[str] = set()
+        grouped: dict[str, list[Order]] = defaultdict(list)
+        ungrouped: list[Order] = []
+        for order in self._active_orders(bar.symbol):
+            if reevaluate_after_flat_only and not entry_reevaluate_after_flat(order):
+                continue
+            if entry_requires_flat(order) and self._has_open_symbol_position(bar.symbol):
+                continue
+            group = oco_group(order)
+            if group is None:
+                ungrouped.append(order)
+            else:
+                grouped[group].append(order)
+
+        for order in ungrouped:
+            decision = self._order_fill_decision(order, resolved)
+            if decision is None:
+                continue
+            fill_time_ns = (
+                fill_time_override_ns
+                if fill_time_override_ns is not None
+                else bar.open_time_ns
+                if decision.at_open
+                else bar.close_time_ns
+            )
+            opened = self._execute_order(
+                order,
+                decision,
+                resolved.spread_ticks,
+                fill_time_ns,
+                fills,
+                trades,
+                events,
+            )
+            if not decision.at_open:
+                intrabar_entries.update(opened)
+
+        for group_id in sorted(grouped):
+            orders = sorted(grouped[group_id], key=lambda item: item.order_id)
+            if (
+                any(entry_requires_flat(order) for order in orders)
+                and self._has_open_symbol_position(bar.symbol)
+            ):
+                continue
+            decisions = [
+                (order, decision)
+                for order in orders
+                if (decision := self._order_fill_decision(order, resolved)) is not None
+            ]
+            if not decisions:
+                continue
+            at_open = [item for item in decisions if item[1].at_open]
+            policy = oco_ambiguous_policy(orders[0])
+            if not at_open and len(decisions) > 1 and policy == OCO_POLICY_CANCEL_ALL:
+                for order in orders:
+                    self._cancel_active_order(
+                        order,
+                        bar.close_time_ns,
+                        "oco_intrabar_ambiguous",
+                        events,
+                    )
+                continue
+            chosen_order, chosen_decision = min(
+                at_open or decisions,
+                key=lambda item: item[0].order_id,
+            )
+            fill_time_ns = (
+                fill_time_override_ns
+                if fill_time_override_ns is not None
+                else bar.open_time_ns
+                if chosen_decision.at_open
+                else bar.close_time_ns
+            )
+            opened = self._execute_order(
+                chosen_order,
+                chosen_decision,
+                resolved.spread_ticks,
+                fill_time_ns,
+                fills,
+                trades,
+                events,
+            )
+            chosen_status = self.state.orders[chosen_order.order_id].status
+            if chosen_status in {OrderStatus.FILLED, OrderStatus.REJECTED}:
+                for sibling in orders:
+                    if sibling.order_id == chosen_order.order_id:
+                        continue
+                    self._cancel_active_order(
+                        sibling,
+                        fill_time_ns,
+                        "oco_sibling_terminal",
+                        events,
+                    )
+            if not chosen_decision.at_open:
+                intrabar_entries.update(opened)
+        return intrabar_entries
+
+    def _cancel_active_order(
+        self,
+        order: Order,
+        time_ns: int,
+        reason: str,
+        events: list[EventEnvelope[dict[str, JsonValue]]],
+    ) -> None:
+        current = self.state.orders.get(order.order_id)
+        if current is None or current.status not in {OrderStatus.ACCEPTED, OrderStatus.ACTIVE}:
+            return
+        cancelled = transition_order(current, OrderStatus.CANCELLED, time_ns)
+        self.state.orders[current.order_id] = cancelled
+        events.append(
+            self._emit(
+                EventType.ORDER_CANCELLED,
+                time_ns,
+                cancelled,
+                extra={"reason": reason},
+            )
+        )
+
+    def _has_open_symbol_position(self, symbol: str) -> bool:
+        return any(position.symbol == symbol for position in self.state.positions.values())
+
     def _order_fill_decision(
         self,
         order: Order,
@@ -537,9 +794,16 @@ class BrokerSimulator:
         trades: list[Trade],
         events: list[EventEnvelope[dict[str, JsonValue]]],
     ) -> tuple[str, ...]:
-        request = order.request
-        profile = self.symbol_profiles[request.symbol]
+        prepared_order = order
         try:
+            prepared_order = self._prepare_order_for_execution(
+                order,
+                decision.price_ticks,
+                time_ns,
+                events,
+            )
+            request = prepared_order.request
+            profile = self.symbol_profiles[request.symbol]
             self._validate_position_protection(
                 PositionSide.LONG.value if request.side is Side.BUY else PositionSide.SHORT.value,
                 decision.price_ticks,
@@ -550,7 +814,7 @@ class BrokerSimulator:
             self._validate_execution_capacity(request, decision.price_ticks)
         except (ValueError, OrderRejectedError) as exc:
             rejected = transition_order(
-                order,
+                prepared_order,
                 OrderStatus.REJECTED,
                 time_ns,
                 rejection_reason=str(exc),
@@ -588,7 +852,7 @@ class BrokerSimulator:
             spread_cost=spread,
             slippage_cost=slippage,
         )
-        filled = apply_fill(order, fill)
+        filled = apply_fill(prepared_order, fill)
         self.state.orders[order.order_id] = filled
         self.state.fills.append(fill)
         fills.append(fill)
@@ -603,6 +867,68 @@ class BrokerSimulator:
         )
         opened = self._apply_fill_to_portfolio(fill, filled, trades, events)
         return opened
+
+    def _prepare_order_for_execution(
+        self,
+        order: Order,
+        entry_ticks: int,
+        time_ns: int,
+        events: list[EventEnvelope[dict[str, JsonValue]]],
+    ) -> Order:
+        instruction = execution_risk_reward_instruction(order.request)
+        if instruction is None:
+            return order
+        request = order.request
+        stop_ticks = cast(int, request.stop_loss_ticks)
+        distance = abs(entry_ticks - stop_ticks)
+        if distance <= 0:
+            raise OrderRejectedError("execution risk/reward requires non-zero stop distance")
+        target_distance = int(
+            (Decimal(distance) * instruction.reward_risk).to_integral_value(
+                rounding=ROUND_HALF_UP
+            )
+        )
+        if target_distance <= 0:
+            raise OrderRejectedError("execution risk/reward target distance is zero")
+        target_ticks = (
+            entry_ticks + target_distance
+            if request.side is Side.BUY
+            else entry_ticks - target_distance
+        )
+        volume = PositionSizer.size(
+            self.run_config.risk.default_sizing,
+            self.state.account.equity,
+            entry_ticks,
+            stop_ticks,
+            self.symbol_profiles[request.symbol],
+            request.volume_lots,
+        )
+        if volume == request.volume_lots and target_ticks == request.take_profit_ticks:
+            return order
+        modified_request = OrderRequest.model_validate(
+            request.model_copy(
+                update={
+                    "volume_lots": volume,
+                    "take_profit_ticks": target_ticks,
+                }
+            ).model_dump()
+        )
+        modified = order.model_copy(
+            update={
+                "request": modified_request,
+                "revision": order.revision + 1,
+            }
+        )
+        self.state.orders[order.order_id] = modified
+        events.append(
+            self._emit(
+                EventType.ORDER_MODIFIED,
+                time_ns,
+                modified,
+                extra={"reason": "execution_risk_reward_recalculation"},
+            )
+        )
+        return modified
 
     def _validate_execution_capacity(self, request: OrderRequest, price_ticks: int) -> None:
         if request.reduce_only:
@@ -1001,7 +1327,8 @@ class BrokerSimulator:
         fills: list[Fill],
         trades: list[Trade],
         events: list[EventEnvelope[dict[str, JsonValue]]],
-    ) -> None:
+    ) -> set[str]:
+        deferred_extrema: set[str] = set()
         for position_id in tuple(sorted(self.state.positions)):
             position = self.state.positions.get(position_id)
             if position is None or position.symbol != bar.symbol:
@@ -1071,9 +1398,15 @@ class BrokerSimulator:
                     extra={"fill_reason": decision.reason},
                 )
             )
+            reversal = None
+            if decision.reason == "stop_loss":
+                entry_order = self.state.orders.get(position.entry_order_id)
+                if entry_order is not None:
+                    reversal = stop_and_reverse_instruction(entry_order.request)
+            original_volume = position.volume_lots
             self._close_position(
                 position,
-                position.volume_lots,
+                original_volume,
                 decision.price_ticks,
                 bar.close_time_ns,
                 fill.order_id,
@@ -1085,6 +1418,165 @@ class BrokerSimulator:
                 trades,
                 events,
             )
+            if reversal is not None:
+                self._revalue_account(bar.close_time_ns, resolved)
+                reversed_position_ids = self._execute_stop_and_reverse(
+                    position,
+                    original_volume,
+                    decision,
+                    reversal.reverse_stop_ticks,
+                    reversal.reward_risk,
+                    reversal.chain_id,
+                    resolved,
+                    bar.close_time_ns,
+                    fills,
+                    trades,
+                    events,
+                )
+                deferred_extrema.update(reversed_position_ids)
+        return deferred_extrema
+
+    def _execute_stop_and_reverse(
+        self,
+        closed_position: PositionState,
+        previous_volume: Decimal,
+        exit_decision: ProtectionDecision,
+        reverse_stop_ticks: int,
+        reward_risk: Decimal,
+        chain_id: str | None,
+        resolved: ResolvedBar,
+        time_ns: int,
+        fills: list[Fill],
+        trades: list[Trade],
+        events: list[EventEnvelope[dict[str, JsonValue]]],
+    ) -> tuple[str, ...]:
+        reverse_side = (
+            Side.SELL if closed_position.side == PositionSide.LONG.value else Side.BUY
+        )
+        entry_ticks = exit_decision.price_ticks
+        stop_distance = abs(entry_ticks - reverse_stop_ticks)
+        if stop_distance <= 0:
+            return ()
+        target_distance = int(
+            (Decimal(stop_distance) * reward_risk).to_integral_value(
+                rounding=ROUND_HALF_UP
+            )
+        )
+        if target_distance <= 0:
+            return ()
+        target_ticks = (
+            entry_ticks + target_distance
+            if reverse_side is Side.BUY
+            else entry_ticks - target_distance
+        )
+        profile = self.symbol_profiles[closed_position.symbol]
+        try:
+            volume = PositionSizer.size(
+                self.run_config.risk.default_sizing,
+                self.state.account.equity,
+                entry_ticks,
+                reverse_stop_ticks,
+                profile,
+                previous_volume,
+            )
+        except OrderRejectedError:
+            return ()
+        tags = {
+            "broker_generated": "stop_and_reverse",
+            "leg": "2",
+        }
+        if chain_id is not None:
+            tags[STOP_AND_REVERSE_CHAIN_ID_TAG] = chain_id
+        request = OrderRequest(
+            client_order_id=self._ids.next("stop_and_reverse_client"),
+            run_id=closed_position.run_id,
+            strategy_instance_id=closed_position.strategy_instance_id,
+            symbol=closed_position.symbol,
+            side=reverse_side,
+            order_type=OrderType.MARKET,
+            volume_lots=volume,
+            created_time_ns=time_ns,
+            stop_loss_ticks=reverse_stop_ticks,
+            take_profit_ticks=target_ticks,
+            tags=tags,
+        )
+        created = Order(order_id=self._ids.next("ord"), request=request)
+        self.state.orders[created.order_id] = created
+        events.append(self._emit(EventType.ORDER_CREATED, time_ns, created))
+        reason = self._submission_rejection_reason(request)
+        if reason is not None:
+            rejected = transition_order(
+                created,
+                OrderStatus.REJECTED,
+                time_ns,
+                rejection_reason=reason,
+            )
+            self.state.orders[rejected.order_id] = rejected
+            events.append(self._emit(EventType.ORDER_REJECTED, time_ns, rejected))
+            return ()
+        accepted = transition_order(created, OrderStatus.ACCEPTED, time_ns)
+        active = transition_order(accepted, OrderStatus.ACTIVE, time_ns)
+        self.state.orders[active.order_id] = active
+        self._client_order_ids.add(request.client_order_id)
+        events.append(self._emit(EventType.ORDER_ACCEPTED, time_ns, accepted))
+        events.append(self._emit(EventType.ORDER_ACTIVATED, time_ns, active))
+        try:
+            self._validate_position_protection(
+                PositionSide.LONG.value
+                if reverse_side is Side.BUY
+                else PositionSide.SHORT.value,
+                entry_ticks,
+                reverse_stop_ticks,
+                target_ticks,
+                profile,
+            )
+            self._validate_execution_capacity(request, entry_ticks)
+        except (ValueError, OrderRejectedError) as exc:
+            rejected = transition_order(
+                active,
+                OrderStatus.REJECTED,
+                time_ns,
+                rejection_reason=str(exc),
+            )
+            self.state.orders[rejected.order_id] = rejected
+            events.append(self._emit(EventType.ORDER_REJECTED, time_ns, rejected))
+            return ()
+        commission = commission_cost(
+            self.run_config.execution.commission,
+            reverse_side,
+            volume,
+            entry_ticks,
+            profile,
+        )
+        spread = spread_cost(resolved.spread_ticks, volume, profile)
+        slippage = slippage_cost(exit_decision.slippage_ticks, volume, profile)
+        fill = Fill(
+            fill_id=self._ids.next("fill"),
+            order_id=active.order_id,
+            run_id=closed_position.run_id,
+            symbol=closed_position.symbol,
+            side=reverse_side,
+            time_ns=time_ns,
+            price_ticks=entry_ticks,
+            volume_lots=volume,
+            commission=commission,
+            spread_cost=spread,
+            slippage_cost=slippage,
+        )
+        filled = apply_fill(active, fill)
+        self.state.orders[filled.order_id] = filled
+        self.state.fills.append(fill)
+        fills.append(fill)
+        self.state.account.balance -= commission
+        events.append(
+            self._emit(
+                EventType.ORDER_FILLED,
+                time_ns,
+                fill,
+                extra={"fill_reason": "stop_and_reverse"},
+            )
+        )
+        return self._apply_fill_to_portfolio(fill, filled, trades, events)
 
     def _protection_decision(
         self,
@@ -1138,6 +1630,18 @@ class BrokerSimulator:
         if policy in {IntrabarPolicy.CONSERVATIVE, IntrabarPolicy.STOP_FIRST}:
             if stop_hit:
                 return self._build_protection_decision(position, open_ticks, "stop_loss", True)
+            entry_order = self.state.orders.get(position.entry_order_id)
+            if (
+                target_hit
+                and entry_order is not None
+                and intrabar_entry_target_allowed(entry_order)
+            ):
+                return self._build_protection_decision(
+                    position,
+                    open_ticks,
+                    "take_profit",
+                    False,
+                )
             return None
         if policy in {IntrabarPolicy.OPTIMISTIC, IntrabarPolicy.TARGET_FIRST}:
             if target_hit:
@@ -1347,7 +1851,13 @@ class BrokerSimulator:
                 self._emit(EventType.POSITION_UPDATED, time_ns, self._position_contract(position))
             )
 
-    def _update_positions_for_bar(self, bar: Bar, resolved: ResolvedBar) -> None:
+    def _update_positions_for_bar(
+        self,
+        bar: Bar,
+        resolved: ResolvedBar,
+        deferred_extrema: set[str] | None = None,
+    ) -> None:
+        deferred = deferred_extrema or set()
         for position in self.state.positions.values():
             if position.symbol != bar.symbol:
                 continue
@@ -1366,16 +1876,17 @@ class BrokerSimulator:
                     Decimal(resolved.ask.high_ticks) - position.average_entry_price_ticks
                 )
                 mark = resolved.ask.close_ticks
-            if favorable_ticks > 0:
-                position.mfe = max(
-                    position.mfe,
-                    money_for_ticks(favorable_ticks, position.volume_lots, profile, True),
-                )
-            if adverse_ticks > 0:
-                position.mae = max(
-                    position.mae,
-                    money_for_ticks(adverse_ticks, position.volume_lots, profile, False),
-                )
+            if position.position_id not in deferred:
+                if favorable_ticks > 0:
+                    position.mfe = max(
+                        position.mfe,
+                        money_for_ticks(favorable_ticks, position.volume_lots, profile, True),
+                    )
+                if adverse_ticks > 0:
+                    position.mae = max(
+                        position.mae,
+                        money_for_ticks(adverse_ticks, position.volume_lots, profile, False),
+                    )
             position.current_price_ticks = mark
             position.last_update_time_ns = bar.close_time_ns
 

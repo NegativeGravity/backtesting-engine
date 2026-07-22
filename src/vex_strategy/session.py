@@ -315,6 +315,40 @@ class StrategyBacktestSession:
         process = self._require_process()
         consumed = _ConsumedOutput()
         try:
+            if (
+                reason == "completed"
+                and self.run_config.metadata.get("close_open_positions_at_end", "false").lower()
+                in {"true", "1", "yes"}
+                and self.broker.open_positions
+            ):
+                close_result = self.broker.close_all_positions(
+                    self._last_time_ns,
+                    "end_of_data",
+                )
+                self.observer.on_broker_result(
+                    self._last_time_ns,
+                    close_result,
+                    self.broker.state_snapshot,
+                )
+                forming_bars = self._require_forming().snapshots(self._last_time_ns)
+                close_output = process.cycle(
+                    WorkerCycleRequest(
+                        event_time_ns=self._last_time_ns,
+                        bars=(),
+                        forming_bars=forming_bars,
+                        broker_events=self._serialize_events(close_result.events),
+                        broker_snapshot=self.broker.state_snapshot,
+                    )
+                )
+                close_consumed = self._consume_with_feedback(
+                    process,
+                    close_output,
+                    self._last_time_ns,
+                    forming_bars,
+                )
+                consumed = _ConsumedOutput(
+                    broker_events=close_result.events
+                ).merge(close_consumed)
             stop_output = process.stop(
                 WorkerStopRequest(
                     event_time_ns=self._last_time_ns,
@@ -322,7 +356,7 @@ class StrategyBacktestSession:
                     broker_snapshot=self.broker.state_snapshot,
                 )
             )
-            consumed = self._consume_output(stop_output)
+            consumed = consumed.merge(self._consume_output(stop_output))
             self._report = self._build_report()
             self._finished = True
         except BaseException:
