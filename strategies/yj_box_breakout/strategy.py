@@ -77,7 +77,7 @@ class YjBoxBreakoutParameters(BaseModel):
     allow_long: bool = True
     allow_short: bool = True
     draw_box: bool = True
-    strict_box_validation: bool = True
+    strict_box_validation: bool = False
 
     @model_validator(mode="after")
     def validate_strategy(self) -> YjBoxBreakoutParameters:

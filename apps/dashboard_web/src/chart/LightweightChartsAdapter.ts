@@ -9,6 +9,7 @@ import {
   type IChartApi,
   type ISeriesApi,
   type LineData,
+  type Time,
   type UTCTimestamp
 } from "lightweight-charts";
 import type { ReplayBar } from "../lib/types";
@@ -59,8 +60,7 @@ export class LightweightChartsAdapter implements ChartAdapter {
       },
       localization: {
         locale: "en-GB",
-        timeFormatter: time => formatTehranChartTime(Number(time))
-      },
+        timeFormatter: (time: Time) => formatTehranChartTime(Number(time))      },
       grid: {
         vertLines: { color: "rgba(38, 47, 61, 0.42)" },
         horzLines: { color: "rgba(38, 47, 61, 0.42)" }
@@ -103,8 +103,9 @@ export class LightweightChartsAdapter implements ChartAdapter {
         conflationThresholdFactor: 1,
         precomputeConflationOnInit: false,
         precomputeConflationPriority: "background",
-        tickMarkFormatter: (time, tickMarkType) =>
-          formatTehranChartTick(Number(time), tickMarkType)
+        tickMarkFormatter: (
+  time: Time,
+  tickMarkType: TickMarkType) => formatTehranChartTick(Number(time), tickMarkType)
       },
       handleScroll: {
         mouseWheel: true,

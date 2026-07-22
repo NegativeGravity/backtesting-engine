@@ -3,7 +3,7 @@ run_id: run_xauusd_yj_tehran_box_breakout_v2
 name: XAUUSD YJ Box Breakout With One Reversal
 strategy:
   strategy_id: yj_box_breakout
-  version: 1.1.0
+  version: 1.1.1
   instance_id: yj_box_breakout_primary
   parameters:
     symbol: XAUUSD
@@ -16,7 +16,7 @@ strategy:
     allow_long: true
     allow_short: true
     draw_box: true
-    strict_box_validation: true
+    strict_box_validation: false
 dataset:
   dataset_id: xauusd_mt5_yj_tehran
   version: "1"
