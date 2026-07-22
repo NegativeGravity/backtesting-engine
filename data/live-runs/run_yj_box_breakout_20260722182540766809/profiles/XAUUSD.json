@@ -1,0 +1,29 @@
+{
+  "calculation_mode": "cfd",
+  "currency_base": "XAU",
+  "currency_margin": "USD",
+  "currency_profit": "USD",
+  "digits": 3,
+  "freeze_level_points": 0,
+  "margin_initial": "0",
+  "margin_maintenance": "0",
+  "metadata": {
+    "note": "mill-point price precision and 1e-12 lot sizing preserve the notebook mathematical path, including half-cent 1.5R targets",
+    "purpose": "notebook_parity",
+    "source_strategy": "yj-strategy.ipynb"
+  },
+  "point": "0.001",
+  "profile_id": "yj_xauusd_fractional",
+  "schema_version": "1.0.0",
+  "stops_level_points": 0,
+  "symbol": "XAUUSD",
+  "trade_contract_size": "100",
+  "trade_tick_size": "0.001",
+  "trade_tick_value": "0.10",
+  "trade_tick_value_loss": "0.10",
+  "trade_tick_value_profit": "0.10",
+  "version": "1.1.0",
+  "volume_max": "1000000000000",
+  "volume_min": "1E-12",
+  "volume_step": "1E-12"
+}

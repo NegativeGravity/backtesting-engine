@@ -1,0 +1,1002 @@
+diff --git a/apps/dashboard_web/src/chart/brokerTradeDrawings.test.ts b/apps/dashboard_web/src/chart/brokerTradeDrawings.test.ts
+index 0530fa6..5e101a3 100644
+--- a/apps/dashboard_web/src/chart/brokerTradeDrawings.test.ts
++++ b/apps/dashboard_web/src/chart/brokerTradeDrawings.test.ts
+@@ -42,6 +42,56 @@ describe("broker trade drawings", () => {
+     expect(drawings[0]?.payload.exit_time_ns).toBe(trade.exit_time_ns);
+   });
+ 
++
++  it("keeps overlapping positions isolated by chain and position id", () => {
++    const positions = [
++      {
++        position_id: "position-day-a",
++        symbol: "XAUUSD",
++        side: "long" as const,
++        status: "open",
++        volume_lots: "1",
++        average_entry_price_ticks: "2939360",
++        opened_time_ns: 3_000_000_000,
++        entry_tags: { chain_id: "2025-02-24-0001", trade_date: "2025-02-24", leg: "1" },
++        current_price_ticks: 2925000,
++        stop_loss_ticks: 2921300,
++        take_profit_ticks: 2966450,
++        realized_pnl: "0",
++        unrealized_pnl: "0"
++      },
++      {
++        position_id: "position-day-b",
++        symbol: "XAUUSD",
++        side: "short" as const,
++        status: "open",
++        volume_lots: "1",
++        average_entry_price_ticks: "2905800",
++        opened_time_ns: 4_000_000_000,
++        entry_tags: { chain_id: "2025-02-25-0002", trade_date: "2025-02-25", leg: "1" },
++        current_price_ticks: 2900000,
++        stop_loss_ticks: 2930140,
++        take_profit_ticks: 2869290,
++        realized_pnl: "0",
++        unrealized_pnl: "0"
++      }
++    ];
++
++    const drawings = buildBrokerTradeDrawings({
++      symbol: "XAUUSD",
++      trades: [],
++      positions,
++      latestTimeNs: 5_000_000_000
++    });
++
++    expect(drawings).toHaveLength(2);
++    const byPosition = new Map(drawings.map(drawing => [drawing.payload.position_id, drawing]));
++    expect(byPosition.get("position-day-a")?.payload.stop_loss_ticks).toBe(2921300);
++    expect(byPosition.get("position-day-a")?.payload.chain_id).toBe("2025-02-24-0001");
++    expect(byPosition.get("position-day-b")?.payload.stop_loss_ticks).toBe(2930140);
++    expect(byPosition.get("position-day-b")?.payload.chain_id).toBe("2025-02-25-0002");
++  });
++
+   it("normalizes broker exit reasons", () => {
+     expect(normalizeExitKind("stop_loss")).toBe("stop_loss");
+     expect(normalizeExitKind("TP")).toBe("take_profit");
+diff --git a/apps/dashboard_web/src/chart/brokerTradeDrawings.ts b/apps/dashboard_web/src/chart/brokerTradeDrawings.ts
+index 9452795..a04c116 100644
+--- a/apps/dashboard_web/src/chart/brokerTradeDrawings.ts
++++ b/apps/dashboard_web/src/chart/brokerTradeDrawings.ts
+@@ -37,6 +37,7 @@ export function brokerTradeIds(drawings: Iterable<DrawingState>): Set<string> {
+ 
+ function toClosedTradeDrawing(trade: TradeRecord): DrawingState {
+   const exitKind = normalizeExitKind(trade.exit_reason);
++  const identity = tradeIdentity(trade.entry_tags);
+   return {
+     drawingId: `broker-trade:${trade.trade_id}`,
+     revision: 1,
+@@ -46,6 +47,9 @@ function toClosedTradeDrawing(trade: TradeRecord): DrawingState {
+       layer_id: "broker-trades",
+       trade_id: trade.trade_id,
+       position_id: trade.position_id,
++      chain_id: identity.chainId,
++      trade_date: identity.tradeDate,
++      leg_number: identity.legNumber,
+       symbol: trade.symbol,
+       side: trade.side,
+       status: "closed",
+@@ -70,6 +74,7 @@ function toOpenPositionDrawing(
+   latestTimeNs: number | null
+ ): DrawingState {
+   const entry = numeric(position.average_entry_price_ticks);
++  const identity = tradeIdentity(position.entry_tags);
+   return {
+     drawingId: `broker-position:${position.position_id}`,
+     revision: Math.max(1, Math.floor((latestTimeNs ?? position.opened_time_ns) / 1_000_000_000)),
+@@ -79,6 +84,9 @@ function toOpenPositionDrawing(
+       layer_id: "broker-trades",
+       trade_id: "",
+       position_id: position.position_id,
++      chain_id: identity.chainId,
++      trade_date: identity.tradeDate,
++      leg_number: identity.legNumber,
+       symbol: position.symbol,
+       side: position.side,
+       status: "open",
+@@ -117,3 +125,20 @@ function nullableNumeric(value: string | number | null | undefined): number | nu
+   const parsed = Number(value);
+   return Number.isFinite(parsed) ? parsed : null;
+ }
++
++interface TradeIdentity {
++  chainId: string;
++  tradeDate: string;
++  legNumber: number;
++}
++
++function tradeIdentity(tags: Record<string, string> | undefined): TradeIdentity {
++  const chainId = tags?.chain_id ?? tags?.["vex.stop_and_reverse.chain_id"] ?? "";
++  const tradeDate = tags?.trade_date ?? "";
++  const parsedLeg = Number(tags?.leg ?? "1");
++  return {
++    chainId,
++    tradeDate,
++    legNumber: parsedLeg === 2 ? 2 : 1
++  };
++}
+diff --git a/apps/dashboard_web/src/chart/drawingPrimitives.ts b/apps/dashboard_web/src/chart/drawingPrimitives.ts
+index d8cdf94..3777c8d 100644
+--- a/apps/dashboard_web/src/chart/drawingPrimitives.ts
++++ b/apps/dashboard_web/src/chart/drawingPrimitives.ts
+@@ -475,7 +475,15 @@ function appendBrokerTradePrimitives(
+     target !== null && Number.isFinite(target) ? target : exit,
+     stop !== null && Number.isFinite(stop) ? stop : exit
+   );
+-  const statusLabel = `${side.toUpperCase()} · ${brokerStatusLabel(exitKind, status)} · PnL ${formatSigned(netPnl)}`;
++  const tradeDate = safeText(drawing.trade_date);
++  const chainId = safeText(drawing.chain_id);
++  const legNumber = Number(drawing.leg_number ?? 1) === 2 ? 2 : 1;
++  const identityLabel = tradeDate
++    ? `${tradeDate} · L${legNumber}`
++    : chainId
++      ? `${chainId} · L${legNumber}`
++      : `L${legNumber}`;
++  const statusLabel = `${identityLabel} · ${side.toUpperCase()} · ${brokerStatusLabel(exitKind, status)} · PnL ${formatSigned(netPnl)}`;
+   output.push(labelPrimitive(x + 6, clampCoordinate(topReference + 16, 18, height - 8), statusLabel, statusColor));
+   output.push(labelPrimitive(
+     x + 6,
+diff --git a/apps/dashboard_web/src/lib/types.ts b/apps/dashboard_web/src/lib/types.ts
+index 5d463f3..93699d4 100644
+--- a/apps/dashboard_web/src/lib/types.ts
++++ b/apps/dashboard_web/src/lib/types.ts
+@@ -113,6 +113,9 @@ export interface PositionRecord {
+   volume_lots: string;
+   average_entry_price_ticks: string;
+   opened_time_ns: number;
++  entry_order_id?: string | null;
++  entry_client_order_id?: string | null;
++  entry_tags?: Record<string, string>;
+   current_price_ticks: number | null;
+   stop_loss_ticks: number | null;
+   take_profit_ticks: number | null;
+@@ -143,6 +146,9 @@ export interface TradeRecord {
+   exit_time_ns: number;
+   entry_price_ticks: string;
+   exit_price_ticks: string;
++  entry_order_id?: string | null;
++  entry_client_order_id?: string | null;
++  entry_tags?: Record<string, string>;
+   stop_loss_ticks: number | null;
+   take_profit_ticks: number | null;
+   gross_pnl: string;
+diff --git a/src/vex_broker/advanced_orders.py b/src/vex_broker/advanced_orders.py
+index 9413aea..8929e1d 100644
+--- a/src/vex_broker/advanced_orders.py
++++ b/src/vex_broker/advanced_orders.py
+@@ -15,8 +15,10 @@ STOP_AND_REVERSE_ENABLED_TAG = "vex.stop_and_reverse.enabled"
+ STOP_AND_REVERSE_STOP_TICKS_TAG = "vex.stop_and_reverse.stop_ticks"
+ STOP_AND_REVERSE_REWARD_RISK_TAG = "vex.stop_and_reverse.reward_risk"
+ STOP_AND_REVERSE_CHAIN_ID_TAG = "vex.stop_and_reverse.chain_id"
++STOP_AND_REVERSE_ACCOUNT_BASIS_TAG = "vex.stop_and_reverse.account_basis"
+ EXECUTION_RISK_REWARD_ENABLED_TAG = "vex.execution_risk_reward.enabled"
+ EXECUTION_REWARD_RISK_TAG = "vex.execution_risk_reward.ratio"
++EXECUTION_ACCOUNT_BASIS_TAG = "vex.execution_risk_reward.account_basis"
+ ENTRY_REQUIRE_FLAT_TAG = "vex.entry.require_flat"
+ ENTRY_REEVALUATE_AFTER_FLAT_TAG = "vex.entry.reevaluate_after_flat"
+ INTRABAR_ENTRY_TARGET_ALLOWED_TAG = "vex.intrabar_entry.target_allowed"
+@@ -25,6 +27,7 @@ INTRABAR_ENTRY_TARGET_ALLOWED_TAG = "vex.intrabar_entry.target_allowed"
+ @dataclass(frozen=True, slots=True)
+ class ExecutionRiskRewardInstruction:
+     reward_risk: Decimal
++    account_basis: str
+ 
+ 
+ @dataclass(frozen=True, slots=True)
+@@ -32,6 +35,7 @@ class StopAndReverseInstruction:
+     reverse_stop_ticks: int
+     reward_risk: Decimal
+     chain_id: str | None
++    account_basis: str
+ 
+ 
+ def oco_group(order: Order) -> str | None:
+@@ -77,7 +81,13 @@ def execution_risk_reward_instruction(
+         raise ValueError("execution risk/reward is not valid on reduce-only orders")
+     if request.stop_loss_ticks is None:
+         raise ValueError("execution risk/reward requires a stop loss")
+-    return ExecutionRiskRewardInstruction(reward_risk=reward_risk)
++    account_basis = request.tags.get(EXECUTION_ACCOUNT_BASIS_TAG, "equity").lower()
++    if account_basis not in {"balance", "equity"}:
++        raise ValueError("execution risk/reward account basis must be balance or equity")
++    return ExecutionRiskRewardInstruction(
++        reward_risk=reward_risk,
++        account_basis=account_basis,
++    )
+ 
+ 
+ def stop_and_reverse_instruction(
+@@ -108,10 +118,14 @@ def stop_and_reverse_instruction(
+     if request.side is Side.SELL and reverse_stop_ticks >= request.stop_loss_ticks:
+         raise ValueError("short stop-and-reverse stop must be below the initial stop")
+     chain_id = request.tags.get(STOP_AND_REVERSE_CHAIN_ID_TAG) or None
++    account_basis = request.tags.get(STOP_AND_REVERSE_ACCOUNT_BASIS_TAG, "equity").lower()
++    if account_basis not in {"balance", "equity"}:
++        raise ValueError("stop-and-reverse account basis must be balance or equity")
+     return StopAndReverseInstruction(
+         reverse_stop_ticks=reverse_stop_ticks,
+         reward_risk=reward_risk,
+         chain_id=chain_id,
++        account_basis=account_basis,
+     )
+ 
+ 
+diff --git a/src/vex_broker/models.py b/src/vex_broker/models.py
+index 0f037d2..dbbe505 100644
+--- a/src/vex_broker/models.py
++++ b/src/vex_broker/models.py
+@@ -21,8 +21,10 @@ class PositionState:
+     average_entry_price_ticks: Decimal
+     opened_time_ns: int
+     entry_order_id: str
+-    stop_loss_ticks: int | None
+-    take_profit_ticks: int | None
++    entry_client_order_id: str
++    entry_tags: dict[str, str] = field(default_factory=dict)
++    stop_loss_ticks: int | None = None
++    take_profit_ticks: int | None = None
+     stop_order_id: str | None = None
+     take_profit_order_id: str | None = None
+     entry_commission: Decimal = ZERO
+diff --git a/src/vex_broker/simulator.py b/src/vex_broker/simulator.py
+index 2860c2f..653114e 100644
+--- a/src/vex_broker/simulator.py
++++ b/src/vex_broker/simulator.py
+@@ -895,9 +895,14 @@ class BrokerSimulator:
+             if request.side is Side.BUY
+             else entry_ticks - target_distance
+         )
++        sizing_capital = (
++            self.state.account.balance
++            if instruction.account_basis == "balance"
++            else self.state.account.equity
++        )
+         volume = PositionSizer.size(
+             self.run_config.risk.default_sizing,
+-            self.state.account.equity,
++            sizing_capital,
+             entry_ticks,
+             stop_ticks,
+             self.symbol_profiles[request.symbol],
+@@ -1160,6 +1165,8 @@ class BrokerSimulator:
+             average_entry_price_ticks=Decimal(price_ticks),
+             opened_time_ns=cast(int, order.terminal_time_ns),
+             entry_order_id=order.order_id,
++            entry_client_order_id=request.client_order_id,
++            entry_tags=dict(request.tags),
+             stop_loss_ticks=request.stop_loss_ticks,
+             take_profit_ticks=request.take_profit_ticks,
+             entry_commission=commission,
+@@ -1427,6 +1434,8 @@ class BrokerSimulator:
+                     reversal.reverse_stop_ticks,
+                     reversal.reward_risk,
+                     reversal.chain_id,
++                    reversal.account_basis,
++                    entry_order.request.tags,
+                     resolved,
+                     bar.close_time_ns,
+                     fills,
+@@ -1444,6 +1453,8 @@ class BrokerSimulator:
+         reverse_stop_ticks: int,
+         reward_risk: Decimal,
+         chain_id: str | None,
++        account_basis: str,
++        source_tags: dict[str, str],
+         resolved: ResolvedBar,
+         time_ns: int,
+         fills: list[Fill],
+@@ -1471,9 +1482,14 @@ class BrokerSimulator:
+         )
+         profile = self.symbol_profiles[closed_position.symbol]
+         try:
++            sizing_capital = (
++                self.state.account.balance
++                if account_basis == "balance"
++                else self.state.account.equity
++            )
+             volume = PositionSizer.size(
+                 self.run_config.risk.default_sizing,
+-                self.state.account.equity,
++                sizing_capital,
+                 entry_ticks,
+                 reverse_stop_ticks,
+                 profile,
+@@ -1482,11 +1498,20 @@ class BrokerSimulator:
+         except OrderRejectedError:
+             return ()
+         tags = {
+-            "broker_generated": "stop_and_reverse",
+-            "leg": "2",
++            key: value
++            for key, value in source_tags.items()
++            if key in {"strategy", "chain_id", "trade_date"}
+         }
++        tags.update(
++            {
++                "broker_generated": "stop_and_reverse",
++                "leg": "2",
++                "direction": "long" if reverse_side is Side.BUY else "short",
++            }
++        )
+         if chain_id is not None:
+             tags[STOP_AND_REVERSE_CHAIN_ID_TAG] = chain_id
++            tags["chain_id"] = chain_id
+         request = OrderRequest(
+             client_order_id=self._ids.next("stop_and_reverse_client"),
+             run_id=closed_position.run_id,
+@@ -1770,6 +1795,9 @@ class BrokerSimulator:
+             exit_time_ns=time_ns,
+             entry_price_ticks=position.average_entry_price_ticks,
+             exit_price_ticks=Decimal(exit_price_ticks),
++            entry_order_id=position.entry_order_id,
++            entry_client_order_id=position.entry_client_order_id,
++            entry_tags=dict(position.entry_tags),
+             stop_loss_ticks=position.stop_loss_ticks,
+             take_profit_ticks=position.take_profit_ticks,
+             gross_pnl=gross_pnl,
+@@ -1795,6 +1823,9 @@ class BrokerSimulator:
+             volume_lots=volume,
+             average_entry_price_ticks=position.average_entry_price_ticks,
+             opened_time_ns=position.opened_time_ns,
++            entry_order_id=position.entry_order_id,
++            entry_client_order_id=position.entry_client_order_id,
++            entry_tags=dict(position.entry_tags),
+             current_price_ticks=exit_price_ticks,
+             stop_loss_ticks=position.stop_loss_ticks,
+             take_profit_ticks=position.take_profit_ticks,
+@@ -2119,6 +2150,9 @@ class BrokerSimulator:
+             volume_lots=state.volume_lots,
+             average_entry_price_ticks=state.average_entry_price_ticks,
+             opened_time_ns=state.opened_time_ns,
++            entry_order_id=state.entry_order_id,
++            entry_client_order_id=state.entry_client_order_id,
++            entry_tags=dict(state.entry_tags),
+             current_price_ticks=state.current_price_ticks,
+             stop_loss_ticks=state.stop_loss_ticks,
+             take_profit_ticks=state.take_profit_ticks,
+diff --git a/src/vex_contracts/positions.py b/src/vex_contracts/positions.py
+index 089eb50..ffaf804 100644
+--- a/src/vex_contracts/positions.py
++++ b/src/vex_contracts/positions.py
+@@ -17,6 +17,9 @@ class Position(ContractModel):
+     volume_lots: Decimal = Field(gt=0)
+     average_entry_price_ticks: Decimal
+     opened_time_ns: NonNegativeInt
++    entry_order_id: Identifier | None = None
++    entry_client_order_id: Identifier | None = None
++    entry_tags: dict[str, str] = Field(default_factory=dict)
+     current_price_ticks: int | None = None
+     stop_loss_ticks: int | None = None
+     take_profit_ticks: int | None = None
+@@ -66,6 +69,9 @@ class Trade(ContractModel):
+     exit_time_ns: NonNegativeInt
+     entry_price_ticks: Decimal
+     exit_price_ticks: Decimal
++    entry_order_id: Identifier | None = None
++    entry_client_order_id: Identifier | None = None
++    entry_tags: dict[str, str] = Field(default_factory=dict)
+     stop_loss_ticks: int | None = None
+     take_profit_ticks: int | None = None
+     gross_pnl: Decimal
+diff --git a/strategies/yj_box_breakout/README.md b/strategies/yj_box_breakout/README.md
+index 7c30716..66d918f 100644
+--- a/strategies/yj_box_breakout/README.md
++++ b/strategies/yj_box_breakout/README.md
+@@ -1,63 +1,73 @@
+ # YJ Box Breakout Strategy
+ 
+-This package implements the execution path from `yj-strategy.ipynb` inside the VEX engine.
++This package implements the YJ XAUUSD M15 box-breakout rules inside the VEX engine.
+ 
+-Source notebook SHA-256:
++Reference notebook SHA-256:
+ 
+ ```text
+ cd2439ebdfa813c9c52d0b528f21a81c03d6ee31c856e8f67215b4087039fc23
+ ```
+ 
+-## Strategy rules
++## Important execution modes
++
++The reference notebook owns one global `position` variable and only opens a new daily trade while that variable is `None`. Therefore the notebook itself is single-position.
++
++VEX 1.3.0 keeps the notebook's execution rules independently for every daily chain and adds an explicit parallel-chain mode:
++
++```yaml
++allow_overlapping_daily_chains: true
++```
++
++When this mode is enabled, a position from an earlier day may remain open while a later day's independent OCO breakout pair is armed and filled. Each chain keeps its own box, stop, target, reversal state, drawings, and broker identity. Set the option to `false`, restore the risk limits to one position, and disable pyramiding for the original single-position notebook behavior.
++
++## Per-chain strategy rules
+ 
+ - Symbol and timeframe: XAUUSD M15.
+-- The source notebook treats the MT5 timestamp exactly as stored. The dedicated dataset manifest therefore maps the stored wall clock to `Asia/Tehran`, converts it to canonical UTC inside the Data Engine, and the strategy converts it back to `Asia/Tehran`. Raw `01:30` consequently remains strategy `01:30` with no seasonal broker-clock drift.
+-- The daily box is always `01:30 <= stored/Tehran wall-clock < 03:30`, independent of the machine timezone.
+-- The daily box contains exactly eight consecutive M15 bars with Tehran open times from 01:30 through 03:15. In notebook-parity mode, a partial box fails the run instead of being silently skipped.
+-- Both breakout directions are armed simultaneously as an OCO pair from the Tehran 03:30 bar onward. The first valid side is traded:
++- Stored MT5 wall clock is mapped to `Asia/Tehran`, converted to canonical UTC by the Data Engine, and converted back to Tehran by the strategy. Raw `01:30` therefore remains strategy `01:30`.
++- The box contains exactly eight consecutive M15 bars with Tehran open times from 01:30 through 03:15.
++- From the 03:30 bar onward both breakout directions are armed as a chain-local OCO pair:
+   - open at or above box high: long at the bar open;
+   - open at or below box low: short at the bar open;
+-  - open inside the box and both boundaries touched: cancel both entries as an ambiguous day;
++  - open inside the box and both boundaries touched: cancel that day's pair as ambiguous;
+   - only box high touched: long at box high;
+   - only box low touched: short at box low.
+-- The pending entry pair is OCO and expires at the next Tehran midnight. A fill on one side cancels the opposite side.
+-- If another trade is still open when a new box becomes tradable, the new pair remains pending. When that position closes, the pair is re-evaluated on the same M15 bar and then on subsequent bars until midnight, matching the notebook's deferred daily-entry behavior.
+-- Initial risk is 1% of current account equity. Because entries are allowed only while flat, this equals current balance at sizing time.
+-- The target is 1.5R.
+-- Gap entries are sized again from their actual fill price, and their target is recalculated from the actual fill-to-stop distance.
+-- Stop loss has priority when stop and target are both touched in one M15 bar.
+-- A target-only touch may close the initial intrabar breakout on the same M15 candle, matching the notebook.
+-- When the initial leg is stopped, exactly one opposite reversal opens at the same stop fill price.
+-- The reversal is sized from the updated account after the initial loss, targets 1.5R, and cannot exit on the same M15 candle.
+-- No third leg is permitted.
+-- Any remaining position is closed at the final available close with `end_of_data`.
+-
+-## Notebook-parity execution profile
++- A fill on one side cancels only the sibling order belonging to the same daily chain.
++- The untriggered pair expires at the next Tehran midnight.
++- Initial risk is 1% of current realized account balance.
++- Target is 1.5R from the actual fill price to that chain's own opposite box edge.
++- Gap fills are resized from the actual fill price and recalculate their target.
++- Stop loss has priority when stop and target are touched in the same M15 bar.
++- A target-only touch may close an initial breakout on its entry candle.
++- If leg 1 stops, exactly one opposite leg 2 opens at the stop fill price.
++- The reversal is sized from updated realized balance, cannot exit on its creation candle, and cannot generate a third leg.
++- Remaining positions are closed at the final available close with `end_of_data`.
+ 
+-The bundled run uses zero spread, zero commission, zero slippage, very high leverage, negative-balance permission, and fractional lot steps. These settings intentionally reproduce the notebook's mathematical model rather than a realistic broker account.
++## Parallel-chain isolation
+ 
+-The parity symbol profile uses a 0.001 price tick and a 1e-12 lot step. Source prices with two decimals remain exact, while 1.5R targets that land on a half-cent remain representable without changing the notebook execution path.
++Every entry position now carries immutable authoritative metadata copied from its originating order:
+ 
+-For OHLC-only intrabar fills, VEX records the engine event time. A fill that occurs somewhere inside a bar is shown at that bar's close event time because the exact tick timestamp is unavailable. Fill price, ordering, result, PnL, and bar association remain deterministic.
++- `entry_order_id`
++- `entry_client_order_id`
++- `entry_tags.chain_id`
++- `entry_tags.trade_date`
++- `entry_tags.leg`
+ 
+-## Chart output
++Protective orders remain bound to `position_id`. A stop in one chain therefore cannot close, redraw, or reverse another chain. Broker-generated reversals inherit the original chain and trade date and are tagged as leg 2.
+ 
+-The strategy draws:
++## Execution profile
+ 
+-- the 01:30–03:30 box;
+-- extended box-high and box-low levels;
+-- initial and reversal entry markers;
+-- exit markers labelled `TP HIT`, `SL HIT`, `END OF DATA`, or `LIQUIDATED`;
+-- TradingView-style risk/reward boxes with leg, direction, open time, close time, net PnL, and R multiple.
++The bundled run uses zero spread, zero commission, zero slippage, very high leverage, negative-balance permission, hedging mode, fractional lot sizing, and higher concurrent-position limits. These settings reproduce the mathematical YJ rules and allow the requested overlapping daily chains; they are not a realistic broker-risk profile.
+ 
+-The dashboard also renders its broker-derived trade overlay from authoritative fills and trades. Completed YJ boxes are retained as audit drawings and are re-upserted when a related position opens or closes, so they remain available when revisiting the trade date.
++The parity symbol profile uses a 0.001 price tick and a 1e-12 lot step. Source prices with two decimals remain exact, and half-cent 1.5R targets remain representable.
+ 
+-## Exact data import
++## Chart output
+ 
+-The YJ package has a dedicated M15 dataset cache because its notebook-parity symbol profile uses 0.001 price ticks and 1e-12 lot sizing. Build it with:
++The strategy draws:
+ 
+-```powershell
+-powershell -ExecutionPolicy ByPass -File .\scripts\import-yj-data.ps1
+-```
++- the forming and completed 01:30–03:30 box;
++- persistent box-high and box-low levels;
++- chain/date/leg-aware entry markers;
++- exit markers labelled `TP HIT`, `SL HIT`, `END OF DATA`, or `LIQUIDATED`;
++- TradingView-style risk/reward boxes.
+ 
+-The bundled source manifest declares the stored CSV wall clock as `Asia/Tehran`, exactly matching the notebook's direct use of the `<DATE>` and `<TIME>` columns. After changing this manifest, delete the old version-1 cache and import version 2 before creating a new run.
++The dashboard broker overlay is keyed by `position_id` or `trade_id` and displays the authoritative trade date and leg. Historical YJ boxes remain available for audit when revisiting the trade date.
+diff --git a/strategies/yj_box_breakout/run.yaml b/strategies/yj_box_breakout/run.yaml
+index 588c604..76727ac 100644
+--- a/strategies/yj_box_breakout/run.yaml
++++ b/strategies/yj_box_breakout/run.yaml
+@@ -3,7 +3,7 @@ run_id: run_xauusd_yj_tehran_box_breakout_v2
+ name: XAUUSD YJ Box Breakout With One Reversal
+ strategy:
+   strategy_id: yj_box_breakout
+-  version: 1.2.0
++  version: 1.3.0
+   instance_id: yj_box_breakout_primary
+   parameters:
+     symbol: XAUUSD
+@@ -17,6 +17,7 @@ strategy:
+     allow_short: true
+     draw_box: true
+     strict_box_validation: true
++    allow_overlapping_daily_chains: true
+ dataset:
+   dataset_id: xauusd_mt5_yj_tehran
+   version: "2"
+@@ -61,9 +62,9 @@ risk:
+   default_sizing:
+     mode: risk_percent
+     risk_percent: "1"
+-  max_open_positions: 1
+-  max_symbol_positions: 1
+-  allow_pyramiding: false
++  max_open_positions: 512
++  max_symbol_positions: 512
++  allow_pyramiding: true
+   allow_long: true
+   allow_short: true
+   max_margin_usage_percent: "100"
+@@ -79,4 +80,6 @@ metadata:
+   timestamp_basis: stored_mt5_wall_clock_mapped_to_Asia/Tehran
+   session_timezone: Asia/Tehran
+   two_sided_breakout: "true"
++  overlapping_daily_chains: "true"
++  notebook_parallel_extension: "true"
+   close_open_positions_at_end: "true"
+diff --git a/strategies/yj_box_breakout/strategy.py b/strategies/yj_box_breakout/strategy.py
+index 3dfc09e..96acc09 100644
+--- a/strategies/yj_box_breakout/strategy.py
++++ b/strategies/yj_box_breakout/strategy.py
+@@ -32,8 +32,10 @@ STOP_AND_REVERSE_ENABLED_TAG = "vex.stop_and_reverse.enabled"
+ STOP_AND_REVERSE_STOP_TICKS_TAG = "vex.stop_and_reverse.stop_ticks"
+ STOP_AND_REVERSE_REWARD_RISK_TAG = "vex.stop_and_reverse.reward_risk"
+ STOP_AND_REVERSE_CHAIN_ID_TAG = "vex.stop_and_reverse.chain_id"
++STOP_AND_REVERSE_ACCOUNT_BASIS_TAG = "vex.stop_and_reverse.account_basis"
+ EXECUTION_RISK_REWARD_ENABLED_TAG = "vex.execution_risk_reward.enabled"
+ EXECUTION_REWARD_RISK_TAG = "vex.execution_risk_reward.ratio"
++EXECUTION_ACCOUNT_BASIS_TAG = "vex.execution_risk_reward.account_basis"
+ ENTRY_REQUIRE_FLAT_TAG = "vex.entry.require_flat"
+ ENTRY_REEVALUATE_AFTER_FLAT_TAG = "vex.entry.reevaluate_after_flat"
+ INTRABAR_ENTRY_TARGET_ALLOWED_TAG = "vex.intrabar_entry.target_allowed"
+@@ -78,6 +80,7 @@ class YjBoxBreakoutParameters(BaseModel):
+     allow_short: bool = True
+     draw_box: bool = True
+     strict_box_validation: bool = True
++    allow_overlapping_daily_chains: bool = True
+ 
+     @model_validator(mode="after")
+     def validate_strategy(self) -> YjBoxBreakoutParameters:
+@@ -108,7 +111,6 @@ class YjBoxBreakoutStrategy(Strategy):
+         self._boxes: dict[date, BoxState] = {}
+         self._chain_ids_by_date: dict[date, str] = {}
+         self._position_visuals: dict[str, TradeVisualState] = {}
+-        self._awaiting_reversal: tuple[date, str] | None = None
+         self._chain_sequence = 0
+         self._session_zone = ZoneInfo(self.config.session_timezone)
+         self._last_trade_date: date | None = None
+@@ -130,16 +132,13 @@ class YjBoxBreakoutStrategy(Strategy):
+             session_timezone=self.config.session_timezone,
+             two_sided_breakout=self.config.allow_long and self.config.allow_short,
+             strict_box_validation=self.config.strict_box_validation,
++            allow_overlapping_daily_chains=self.config.allow_overlapping_daily_chains,
+         )
+ 
+     def on_bar(self, context: StrategyContext, bar: Bar) -> None:
+         config = self.config
+         if bar.symbol != config.symbol or bar.timeframe is not config.signal_timeframe:
+             return
+-        if self._awaiting_reversal is not None and not context.portfolio.positions(
+-            config.symbol
+-        ):
+-            self._awaiting_reversal = None
+         opened = self._session_datetime(bar.open_time_ns)
+         trade_date = opened.date()
+         minute = opened.hour * 60 + opened.minute
+@@ -296,12 +295,15 @@ class YjBoxBreakoutStrategy(Strategy):
+             STOP_AND_REVERSE_ENABLED_TAG: "true",
+             STOP_AND_REVERSE_REWARD_RISK_TAG: str(config.reward_risk_ratio),
+             STOP_AND_REVERSE_CHAIN_ID_TAG: chain_id,
++            STOP_AND_REVERSE_ACCOUNT_BASIS_TAG: "balance",
+             EXECUTION_RISK_REWARD_ENABLED_TAG: "true",
+             EXECUTION_REWARD_RISK_TAG: str(config.reward_risk_ratio),
+-            ENTRY_REQUIRE_FLAT_TAG: "true",
+-            ENTRY_REEVALUATE_AFTER_FLAT_TAG: "true",
++            EXECUTION_ACCOUNT_BASIS_TAG: "balance",
+             INTRABAR_ENTRY_TARGET_ALLOWED_TAG: "true",
+         }
++        if not config.allow_overlapping_daily_chains:
++            common_tags[ENTRY_REQUIRE_FLAT_TAG] = "true"
++            common_tags[ENTRY_REEVALUATE_AFTER_FLAT_TAG] = "true"
+         if config.allow_long:
+             long_client_id = f"yj-long-{chain_id}"
+             long_tags = common_tags | {
+@@ -358,21 +360,7 @@ class YjBoxBreakoutStrategy(Strategy):
+             return
+         if position.stop_loss_ticks is None or position.take_profit_ticks is None:
+             return
+-        if self._awaiting_reversal is not None:
+-            trade_date, chain_id = self._awaiting_reversal
+-            leg_number = 2
+-            self._awaiting_reversal = None
+-        else:
+-            event_date = self._session_datetime(position.opened_time_ns).date()
+-            candidate = self._latest_box_on_or_before(event_date)
+-            if candidate is None:
+-                return
+-            trade_date = candidate.trade_date
+-            chain_id = self._chain_ids_by_date.get(
+-                trade_date,
+-                f"{trade_date.isoformat()}-unknown",
+-            )
+-            leg_number = 1
++        trade_date, chain_id, leg_number = self._position_identity(position)
+         visual = TradeVisualState(
+             trade_date=trade_date,
+             chain_id=chain_id,
+@@ -396,7 +384,8 @@ class YjBoxBreakoutStrategy(Strategy):
+             position.stop_loss_ticks,
+             position.take_profit_ticks,
+             label=(
+-                f"YJ LEG {leg_number} {position.side.value.upper()} | "
++                f"YJ {trade_date.isoformat()} | CHAIN {chain_id} | "
++                f"LEG {leg_number} {position.side.value.upper()} | "
+                 f"OPEN {self._format_time(position.opened_time_ns)}"
+             ),
+             z_index=20,
+@@ -414,18 +403,24 @@ class YjBoxBreakoutStrategy(Strategy):
+             else ChartMarkerPosition.ABOVE_BAR,
+             "#089981" if position.side is PositionSide.LONG else "#F23645",
+             price_ticks=position.average_entry_price_ticks,
+-            text=f"LEG {leg_number} {position.side.value.upper()}",
++            text=(
++                f"{trade_date.isoformat()} L{leg_number} "
++                f"{position.side.value.upper()}"
++            ),
+             z_index=30,
+         )
+         context.log.info(
+             "yj_position_opened",
+             position_id=position.position_id,
++            entry_order_id=position.entry_order_id or "",
+             chain_id=chain_id,
++            trade_date=trade_date.isoformat(),
+             leg_number=leg_number,
+             side=position.side.value,
+             entry_ticks=float(position.average_entry_price_ticks),
+             stop_ticks=position.stop_loss_ticks,
+             target_ticks=position.take_profit_ticks,
++            concurrent_positions=len(context.portfolio.positions(self.config.symbol)),
+         )
+ 
+     def _position_closed(
+@@ -480,10 +475,6 @@ class YjBoxBreakoutStrategy(Strategy):
+             text=f"{hit_label} {trade.net_pnl:.2f}",
+             z_index=31,
+         )
+-        if visual.leg_number == 1 and trade.exit_reason.startswith("stop_loss"):
+-            self._awaiting_reversal = (visual.trade_date, visual.chain_id)
+-        else:
+-            self._awaiting_reversal = None
+         context.log.info(
+             "yj_position_closed",
+             trade_id=trade.trade_id,
+@@ -603,13 +594,37 @@ class YjBoxBreakoutStrategy(Strategy):
+         order = Order.model_validate(payload)
+         if order.request.tags.get("broker_generated") != "stop_and_reverse":
+             return
+-        self._awaiting_reversal = None
+         context.log.warning(
+             "yj_reversal_rejected",
+             order_id=order.order_id,
++            chain_id=order.request.tags.get("chain_id", ""),
++            trade_date=order.request.tags.get("trade_date", ""),
+             reason=order.rejection_reason,
+         )
+ 
++    def _position_identity(self, position: Position) -> tuple[date, str, int]:
++        tags = position.entry_tags
++        raw_date = tags.get("trade_date")
++        raw_chain = tags.get("chain_id") or tags.get(STOP_AND_REVERSE_CHAIN_ID_TAG)
++        raw_leg = tags.get("leg", "1")
++        try:
++            trade_date = date.fromisoformat(raw_date) if raw_date else None
++        except ValueError:
++            trade_date = None
++        try:
++            leg_number = int(raw_leg)
++        except ValueError:
++            leg_number = 1
++        if trade_date is None:
++            event_date = self._session_datetime(position.opened_time_ns).date()
++            candidate = self._latest_box_on_or_before(event_date)
++            trade_date = candidate.trade_date if candidate is not None else event_date
++        chain_id = raw_chain or self._chain_ids_by_date.get(
++            trade_date,
++            f"{trade_date.isoformat()}-unknown",
++        )
++        return trade_date, chain_id, 2 if leg_number == 2 else 1
++
+     def _latest_box_on_or_before(self, value: date) -> BoxState | None:
+         candidates = [box for day, box in self._boxes.items() if day <= value]
+         return max(candidates, key=lambda box: box.trade_date) if candidates else None
+diff --git a/strategies/yj_box_breakout/strategy.yaml b/strategies/yj_box_breakout/strategy.yaml
+index f842c33..c9a1df3 100644
+--- a/strategies/yj_box_breakout/strategy.yaml
++++ b/strategies/yj_box_breakout/strategy.yaml
+@@ -1,9 +1,9 @@
+ schema_version: 1.0.0
+ strategy_id: yj_box_breakout
+ name: YJ Tehran 01:30-03:30 Box Breakout
+-version: 1.2.0
++version: 1.3.0
+ entrypoint: yj_box_breakout.strategy:YjBoxBreakoutStrategy
+-description: Exact yj-strategy.ipynb execution parity on XAUUSD M15 stored wall-clock 01:30-03:30, with 1 percent current-balance risk, 1.5R target, conservative intrabar resolution, and one opposite reversal only after the initial stop.
++description: YJ XAUUSD M15 01:30-03:30 box breakout with notebook-equivalent per-chain execution and an explicit parallel-daily-chain extension that allows independent positions from different trade dates to overlap.
+ subscriptions:
+   - symbol: XAUUSD
+     timeframe: M15
+@@ -26,9 +26,12 @@ default_parameters:
+   allow_short: true
+   draw_box: true
+   strict_box_validation: true
++  allow_overlapping_daily_chains: true
+ tags:
+   - xauusd
+   - m15
+   - box_breakout
+   - reversal
++  - hedging
++  - parallel_chains
+   - yj
+diff --git a/tests/test_advanced_orders.py b/tests/test_advanced_orders.py
+index cfd8098..a10c936 100644
+--- a/tests/test_advanced_orders.py
++++ b/tests/test_advanced_orders.py
+@@ -4,12 +4,14 @@ from pathlib import Path
+ from vex_broker.advanced_orders import (
+     ENTRY_REEVALUATE_AFTER_FLAT_TAG,
+     ENTRY_REQUIRE_FLAT_TAG,
++    EXECUTION_ACCOUNT_BASIS_TAG,
+     EXECUTION_REWARD_RISK_TAG,
+     EXECUTION_RISK_REWARD_ENABLED_TAG,
+     INTRABAR_ENTRY_TARGET_ALLOWED_TAG,
+     OCO_AMBIGUOUS_POLICY_TAG,
+     OCO_GROUP_TAG,
+     OCO_POLICY_CANCEL_ALL,
++    STOP_AND_REVERSE_ACCOUNT_BASIS_TAG,
+     STOP_AND_REVERSE_CHAIN_ID_TAG,
+     STOP_AND_REVERSE_ENABLED_TAG,
+     STOP_AND_REVERSE_REWARD_RISK_TAG,
+@@ -66,6 +68,10 @@ def make_breakout_order(
+     target_ticks: int,
+     reverse_stop_ticks: int,
+     group: str = "yj-test-group",
++    chain_id: str = "test-chain",
++    trade_date: str = "2025-01-03",
++    require_flat: bool = True,
++    created_time_ns: int = 0,
+ ) -> OrderRequest:
+     return OrderRequest(
+         client_order_id=client_order_id,
+@@ -75,7 +81,7 @@ def make_breakout_order(
+         side=side,
+         order_type=OrderType.STOP,
+         volume_lots=Decimal("5"),
+-        created_time_ns=0,
++        created_time_ns=created_time_ns,
+         price_ticks=trigger_ticks,
+         stop_loss_ticks=stop_ticks,
+         take_profit_ticks=target_ticks,
+@@ -83,17 +89,28 @@ def make_breakout_order(
+         expiration_time_ns=86_400 * NS,
+         tags={
+             "strategy": "yj_box_breakout",
++            "chain_id": chain_id,
++            "trade_date": trade_date,
++            "leg": "1",
+             OCO_GROUP_TAG: group,
+             OCO_AMBIGUOUS_POLICY_TAG: OCO_POLICY_CANCEL_ALL,
+             EXECUTION_RISK_REWARD_ENABLED_TAG: "true",
+             EXECUTION_REWARD_RISK_TAG: "1.5",
+-            ENTRY_REQUIRE_FLAT_TAG: "true",
+-            ENTRY_REEVALUATE_AFTER_FLAT_TAG: "true",
++            EXECUTION_ACCOUNT_BASIS_TAG: "balance",
++            **(
++                {
++                    ENTRY_REQUIRE_FLAT_TAG: "true",
++                    ENTRY_REEVALUATE_AFTER_FLAT_TAG: "true",
++                }
++                if require_flat
++                else {}
++            ),
+             INTRABAR_ENTRY_TARGET_ALLOWED_TAG: "true",
+             STOP_AND_REVERSE_ENABLED_TAG: "true",
+             STOP_AND_REVERSE_STOP_TICKS_TAG: str(reverse_stop_ticks),
+             STOP_AND_REVERSE_REWARD_RISK_TAG: "1.5",
+-            STOP_AND_REVERSE_CHAIN_ID_TAG: "test-chain",
++            STOP_AND_REVERSE_CHAIN_ID_TAG: chain_id,
++            STOP_AND_REVERSE_ACCOUNT_BASIS_TAG: "balance",
+         },
+     )
+ 
+@@ -393,3 +410,113 @@ def test_conservative_stop_priority_and_no_third_leg(project_root: Path) -> None
+         if order.request.tags.get("broker_generated") == "stop_and_reverse"
+     ]
+     assert len(generated) == 1
++
++
++def test_parallel_daily_chains_open_together_and_keep_protections_isolated(
++    project_root: Path,
++) -> None:
++    instance, run = broker(project_root)
++
++    instance.submit_order(
++        make_breakout_order(
++            run,
++            client_order_id="day-a-long",
++            side=Side.BUY,
++            trigger_ticks=1100,
++            stop_ticks=900,
++            target_ticks=1400,
++            reverse_stop_ticks=1100,
++            group="day-a",
++            chain_id="2025-02-24-0001",
++            trade_date="2025-02-24",
++            require_flat=False,
++        )
++    )
++    instance.submit_order(
++        make_breakout_order(
++            run,
++            client_order_id="day-a-short",
++            side=Side.SELL,
++            trigger_ticks=900,
++            stop_ticks=1100,
++            target_ticks=600,
++            reverse_stop_ticks=900,
++            group="day-a",
++            chain_id="2025-02-24-0001",
++            trade_date="2025-02-24",
++            require_flat=False,
++        )
++    )
++
++    first = instance.process_bar(make_bar(1, 1120, 1140, 1000, 1100))
++    assert len(first.positions) == 1
++    day_a = first.positions[0]
++    assert day_a.entry_tags["chain_id"] == "2025-02-24-0001"
++    assert day_a.stop_loss_ticks == 900
++
++    instance.submit_order(
++        make_breakout_order(
++            run,
++            client_order_id="day-b-long",
++            side=Side.BUY,
++            trigger_ticks=1200,
++            stop_ticks=1000,
++            target_ticks=1500,
++            reverse_stop_ticks=1200,
++            group="day-b",
++            chain_id="2025-02-25-0002",
++            trade_date="2025-02-25",
++            require_flat=False,
++            created_time_ns=first.account_snapshot.timestamp_ns,
++        )
++    )
++    instance.submit_order(
++        make_breakout_order(
++            run,
++            client_order_id="day-b-short",
++            side=Side.SELL,
++            trigger_ticks=1000,
++            stop_ticks=1200,
++            target_ticks=700,
++            reverse_stop_ticks=1000,
++            group="day-b",
++            chain_id="2025-02-25-0002",
++            trade_date="2025-02-25",
++            require_flat=False,
++            created_time_ns=first.account_snapshot.timestamp_ns,
++        )
++    )
++
++    second = instance.process_bar(make_bar(2, 1080, 1090, 990, 1020))
++    assert len(second.positions) == 2
++    by_chain = {position.entry_tags["chain_id"]: position for position in second.positions}
++    assert by_chain["2025-02-24-0001"].side is PositionSide.LONG
++    assert by_chain["2025-02-24-0001"].stop_loss_ticks == 900
++    assert by_chain["2025-02-25-0002"].side is PositionSide.SHORT
++    assert by_chain["2025-02-25-0002"].stop_loss_ticks == 1200
++
++    third = instance.process_bar(make_bar(3, 1080, 1210, 950, 1100))
++
++    assert len(third.trades) == 1
++    stopped = third.trades[0]
++    assert stopped.entry_tags["chain_id"] == "2025-02-25-0002"
++    assert stopped.entry_tags["trade_date"] == "2025-02-25"
++    assert stopped.stop_loss_ticks == 1200
++    assert stopped.exit_reason == "stop_loss"
++
++    assert len(third.positions) == 2
++    remaining_by_chain = {
++        position.entry_tags["chain_id"]: position
++        for position in third.positions
++    }
++    original = remaining_by_chain["2025-02-24-0001"]
++    reversal = remaining_by_chain["2025-02-25-0002"]
++    assert original.side is PositionSide.LONG
++    assert original.stop_loss_ticks == 900
++    assert original.take_profit_ticks == 1450
++    assert reversal.side is PositionSide.LONG
++    assert reversal.entry_tags["leg"] == "2"
++    assert reversal.entry_tags["trade_date"] == "2025-02-25"
++    assert reversal.stop_loss_ticks == 1000
++    assert reversal.take_profit_ticks == 1500
++    assert original.position_id != reversal.position_id
+diff --git a/tests/test_yj_strategy.py b/tests/test_yj_strategy.py
+index 5c2fae1..385da72 100644
+--- a/tests/test_yj_strategy.py
++++ b/tests/test_yj_strategy.py
+@@ -8,10 +8,12 @@ import pytest
+ from strategies.yj_box_breakout.strategy import (
+     ENTRY_REEVALUATE_AFTER_FLAT_TAG,
+     ENTRY_REQUIRE_FLAT_TAG,
++    EXECUTION_ACCOUNT_BASIS_TAG,
+     EXECUTION_REWARD_RISK_TAG,
+     EXECUTION_RISK_REWARD_ENABLED_TAG,
+     INTRABAR_ENTRY_TARGET_ALLOWED_TAG,
+     OCO_AMBIGUOUS_POLICY_TAG,
++    STOP_AND_REVERSE_ACCOUNT_BASIS_TAG,
+     STOP_AND_REVERSE_ENABLED_TAG,
+     YjBoxBreakoutParameters,
+     YjBoxBreakoutStrategy,
+@@ -76,6 +78,7 @@ def test_yj_parameters_preserve_notebook_defaults() -> None:
+     assert parameters.session_timezone == "Asia/Tehran"
+     assert parameters.allow_long is True
+     assert parameters.allow_short is True
++    assert parameters.allow_overlapping_daily_chains is True
+ 
+ 
+ def test_yj_dataset_and_session_clocks_are_explicit(project_root: Path) -> None:
+@@ -93,7 +96,7 @@ def test_yj_dataset_and_session_clocks_are_explicit(project_root: Path) -> None:
+     assert run.strategy.parameters["strict_box_validation"] is True
+     assert run.start_time.isoformat() == "2025-01-02T01:00:00+03:30"
+     assert run.end_time.isoformat() == "2026-07-13T13:30:00+03:30"
+-    assert descriptor.version == "1.2.0"
++    assert descriptor.version == "1.3.0"
+ 
+ 
+ def test_yj_run_uses_notebook_parity_execution_profile(project_root: Path) -> None:
+@@ -102,6 +105,9 @@ def test_yj_run_uses_notebook_parity_execution_profile(project_root: Path) -> No
+     assert run.account.leverage == Decimal("1000000")
+     assert run.account.allow_negative_balance is True
+     assert run.risk.max_margin_usage_percent == Decimal("100")
++    assert run.risk.max_open_positions == 512
++    assert run.risk.max_symbol_positions == 512
++    assert run.risk.allow_pyramiding is True
+     assert run.execution.spread.points == 0
+     assert run.execution.commission.mode.value == "none"
+     assert profile.digits == 3
+@@ -205,8 +211,10 @@ def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
+     assert long_intent.tags[STOP_AND_REVERSE_ENABLED_TAG] == "true"
+     assert long_intent.tags[EXECUTION_RISK_REWARD_ENABLED_TAG] == "true"
+     assert long_intent.tags[EXECUTION_REWARD_RISK_TAG] == "1.5"
+-    assert long_intent.tags[ENTRY_REQUIRE_FLAT_TAG] == "true"
+-    assert long_intent.tags[ENTRY_REEVALUATE_AFTER_FLAT_TAG] == "true"
++    assert long_intent.tags[EXECUTION_ACCOUNT_BASIS_TAG] == "balance"
++    assert long_intent.tags[STOP_AND_REVERSE_ACCOUNT_BASIS_TAG] == "balance"
++    assert ENTRY_REQUIRE_FLAT_TAG not in long_intent.tags
++    assert ENTRY_REEVALUATE_AFTER_FLAT_TAG not in long_intent.tags
+     assert long_intent.tags[INTRABAR_ENTRY_TARGET_ALLOWED_TAG] == "true"
+ 
+     assert short_intent.order_type is OrderType.STOP
+@@ -219,8 +227,10 @@ def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
+     assert short_intent.tags[STOP_AND_REVERSE_ENABLED_TAG] == "true"
+     assert short_intent.tags[EXECUTION_RISK_REWARD_ENABLED_TAG] == "true"
+     assert short_intent.tags[EXECUTION_REWARD_RISK_TAG] == "1.5"
+-    assert short_intent.tags[ENTRY_REQUIRE_FLAT_TAG] == "true"
+-    assert short_intent.tags[ENTRY_REEVALUATE_AFTER_FLAT_TAG] == "true"
++    assert short_intent.tags[EXECUTION_ACCOUNT_BASIS_TAG] == "balance"
++    assert short_intent.tags[STOP_AND_REVERSE_ACCOUNT_BASIS_TAG] == "balance"
++    assert ENTRY_REQUIRE_FLAT_TAG not in short_intent.tags
++    assert ENTRY_REEVALUATE_AFTER_FLAT_TAG not in short_intent.tags
+     assert short_intent.tags[INTRABAR_ENTRY_TARGET_ALLOWED_TAG] == "true"
+     assert long_intent.tags["vex.oco.group"] == short_intent.tags["vex.oco.group"]
+     tehran_midnight = datetime(2025, 1, 4, tzinfo=TEHRAN).astimezone(UTC)
