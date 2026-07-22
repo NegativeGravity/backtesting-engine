@@ -4,6 +4,7 @@ import type { ReplayWorkerCommand, ReplayWorkerEvent, ReplayWorkerStatus } from 
 import type {
   AnalyticsComparisonReport,
   AnalyticsReport,
+  ReplayBootstrap,
   ReplayCatalog,
   ReplayControlCommand,
   ReplayFrame,
@@ -25,6 +26,28 @@ export async function fetchCatalog(): Promise<ReplayCatalog> {
   const response = await fetch("/api/catalog");
   if (!response.ok) throw new ApiError(`Catalog request failed: ${response.status}`, response.status);
   return response.json() as Promise<ReplayCatalog>;
+}
+
+
+export async function fetchReplayWindow(
+  runId: string,
+  symbol: string,
+  timeframe: Timeframe,
+  cursorTimeNs: number,
+  historyCount: number,
+  signal?: AbortSignal
+): Promise<ReplayBootstrap> {
+  const url = new URL(`/api/runs/${runId}/bootstrap`, window.location.origin);
+  url.searchParams.set("symbol", symbol);
+  url.searchParams.set("timeframe", timeframe);
+  url.searchParams.set("cursor_time_ns", String(Math.max(0, Math.trunc(cursorTimeNs))));
+  url.searchParams.set("history_count", String(Math.max(50, Math.min(5_000, Math.trunc(historyCount)))));
+  const response = await fetch(url, signal ? { signal } : undefined);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { detail?: string } | null;
+    throw new ApiError(payload?.detail ?? `Replay window request failed: ${response.status}`, response.status);
+  }
+  return response.json() as Promise<ReplayBootstrap>;
 }
 
 export async function fetchAnalytics(runId: string, endTimeNs?: number): Promise<AnalyticsReport> {
@@ -235,7 +258,7 @@ export class ReplaySocket {
       this.pendingUiFrame = this.pendingUiFrame
         ? mergeAdvanceFramesFast(this.pendingUiFrame, uiFrame, {
             maxBars: 1,
-            maxTimelineItems: 5_000
+            maxTimelineItems: 1_500
           })
         : uiFrame;
       this.scheduleUiFrame();

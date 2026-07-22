@@ -1,7 +1,7 @@
 FROM public.ecr.aws/docker/library/node:22-alpine AS dashboard-build
 WORKDIR /build/apps/dashboard_web
 COPY apps/dashboard_web/package.json apps/dashboard_web/package-lock.json apps/dashboard_web/.npmrc ./
-RUN npm ci --registry=https://registry.npmjs.org/ --replace-registry-host=always
+RUN npm ci
 COPY apps/dashboard_web ./
 RUN npm run build
 

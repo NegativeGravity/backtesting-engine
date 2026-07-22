@@ -29,17 +29,15 @@ export const InspectorPanel = memo(function InspectorPanel({
   orders,
   tickSize
 }: Props) {
-  const recent = timeline.slice(-10).reverse();
-  const chartLayers = useMemo(() => new Set(
-    timeline
-      .filter(item => item.kind === "chart_command")
-      .map(item => {
-        const payload = item.payload;
-        const commandPayload = (payload.drawing ?? payload.series) as Record<string, unknown> | undefined;
-        return String(commandPayload?.layer_id ?? "strategy");
-      })
-  ), [timeline]);
-  const activeOrders = orders.filter(order => ["accepted", "active", "partially_filled"].includes(order.status));
+  const recent = useMemo(() => timeline.slice(-10).reverse(), [timeline]);
+  const chartLayers = useMemo(() => recentChartLayers(timeline, 8), [timeline]);
+  const activeOrderCount = useMemo(
+    () => orders.reduce(
+      (count, order) => count + (["accepted", "active", "partially_filled"].includes(order.status) ? 1 : 0),
+      0
+    ),
+    [orders]
+  );
 
   return (
     <aside className="inspector-panel">
@@ -78,7 +76,7 @@ export const InspectorPanel = memo(function InspectorPanel({
           {positions.length === 0 ? <div className="empty-inline">No open positions</div> : null}
           <div className="exposure-summary">
             <span>{positions.length} positions</span>
-            <span>{activeOrders.length} active orders</span>
+            <span>{activeOrderCount} active orders</span>
           </div>
         </div>
       </section>
@@ -116,6 +114,18 @@ export const InspectorPanel = memo(function InspectorPanel({
     </aside>
   );
 });
+
+function recentChartLayers(timeline: ReplayTimelineItem[], maximum: number): Set<string> {
+  const result = new Set<string>();
+  for (let index = timeline.length - 1; index >= 0 && result.size < maximum; index -= 1) {
+    const item = timeline[index];
+    if (!item || item.kind !== "chart_command") continue;
+    const payload = item.payload;
+    const commandPayload = (payload.drawing ?? payload.series) as Record<string, unknown> | undefined;
+    result.add(String(commandPayload?.layer_id ?? "strategy"));
+  }
+  return result;
+}
 
 function eventTitle(item: ReplayTimelineItem): string {
   if (item.kind === "broker_event") return String(item.payload.event_type ?? "Broker event");

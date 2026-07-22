@@ -1,8 +1,7 @@
 import type { CanvasDrawingPrimitive, CanvasTextPrimitive } from "../lib/drawingProtocol";
 import type { ChartCoordinates } from "./ChartAdapter";
 import type { DrawingState } from "./chartState";
-
-const DEFAULT_MAX_DRAWINGS = 1_500;
+import { MAX_VISIBLE_DRAWINGS } from "./performanceLimits";
 const VIEWPORT_MARGIN = 120;
 const TEHRAN_TRADE_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   day: "2-digit",
@@ -21,9 +20,10 @@ export function buildDrawingPrimitives(
   tickSize: number,
   width: number,
   height: number,
-  maximumDrawings = DEFAULT_MAX_DRAWINGS
+  latestTimeNs: number | null = null,
+  maximumDrawings = MAX_VISIBLE_DRAWINGS
 ): CanvasDrawingPrimitive[] {
-  const candidates = Array.from(drawings).slice(-maximumDrawings);
+  const candidates = boundedTail(drawings, maximumDrawings);
   const output: CanvasDrawingPrimitive[] = [];
 
   for (const state of candidates) {
@@ -35,8 +35,13 @@ export function buildDrawingPrimitives(
       const start = asPoint(drawing.start);
       const end = asPoint(drawing.end);
       if (!start || !end) continue;
-      const x1 = coordinates.timeToX(start.timeNs);
-      const x2 = coordinates.timeToX(end.timeNs);
+      const x1 = resolveTimeCoordinate(start.timeNs, coordinates, latestTimeNs);
+      const x2 = resolveLineEndCoordinate(
+        end.timeNs,
+        coordinates,
+        latestTimeNs,
+        width
+      );
       const y1 = coordinates.priceToY(start.priceTicks * tickSize);
       const y2 = coordinates.priceToY(end.priceTicks * tickSize);
       if (x1 === null || x2 === null || y1 === null || y2 === null) continue;
@@ -81,13 +86,20 @@ export function buildDrawingPrimitives(
       const start = asPoint(drawing.start);
       const end = asPoint(drawing.end);
       if (!start || !end) continue;
-      const x1 = coordinates.timeToX(start.timeNs);
-      const x2 = coordinates.timeToX(end.timeNs);
+      const x1 = resolveTimeCoordinate(start.timeNs, coordinates, latestTimeNs);
+      const resolvedEnd = resolveTimeCoordinate(end.timeNs, coordinates, latestTimeNs);
+      const x2 = resolvedEnd !== null && latestTimeNs !== null && end.timeNs > latestTimeNs
+        ? resolvedEnd + 6
+        : resolvedEnd;
       const y1 = coordinates.priceToY(start.priceTicks * tickSize);
       const y2 = coordinates.priceToY(end.priceTicks * tickSize);
       if (x1 === null || x2 === null || y1 === null || y2 === null) continue;
       if (![x1, x2, y1, y2].every(Number.isFinite)) continue;
-      const rect = normalizedRect(x1, y1, x2, y2);
+      const normalized = normalizedRect(x1, y1, x2, y2);
+      const rect = {
+        ...normalized,
+        width: Math.max(4, normalized.width)
+      };
       if (!rectIntersectsViewport(rect.x, rect.y, rect.width, rect.height, width, height)) continue;
       const border = asAppearance(drawing.border);
       const fill = asFill(drawing.fill);
@@ -100,11 +112,22 @@ export function buildDrawingPrimitives(
         strokeWidth: border.width,
         dash: dash(border.style)
       });
+      const label = safeText(drawing.label);
+      if (label) {
+        output.push({
+          ...textPrimitive(rect.x + 6, Math.max(14, rect.y + 14), label, border.color),
+          background: "rgba(8, 12, 18, 0.78)"
+        });
+      }
       continue;
     }
 
     if (kind === "marker") {
-      const x = coordinates.timeToX(Number(drawing.time_ns));
+      const x = resolveTimeCoordinate(
+        Number(drawing.time_ns),
+        coordinates,
+        latestTimeNs
+      );
       const priceTicks = drawing.price_ticks;
       const y = priceTicks === null || priceTicks === undefined
         ? null
@@ -129,7 +152,7 @@ export function buildDrawingPrimitives(
     if (kind === "label") {
       const anchor = asPoint(drawing.anchor);
       if (!anchor) continue;
-      const x = coordinates.timeToX(anchor.timeNs);
+      const x = resolveTimeCoordinate(anchor.timeNs, coordinates, latestTimeNs);
       const y = coordinates.priceToY(anchor.priceTicks * tickSize);
       if (x === null || y === null || !Number.isFinite(x) || !Number.isFinite(y)) continue;
       if (!pointInsideViewport(x, y, width, height)) continue;
@@ -143,15 +166,23 @@ export function buildDrawingPrimitives(
     }
 
     if (kind === "broker_trade") {
-      appendBrokerTradePrimitives(output, drawing, coordinates, tickSize, width, height);
+      appendBrokerTradePrimitives(
+        output,
+        drawing,
+        coordinates,
+        tickSize,
+        width,
+        height,
+        latestTimeNs
+      );
       continue;
     }
 
     if (kind === "risk_reward") {
       const entryTime = Number(drawing.entry_time_ns);
       const exitTime = Number(drawing.exit_time_ns ?? entryTime + 30 * 60 * 1_000_000_000);
-      const x1 = coordinates.timeToX(entryTime);
-      const x2 = coordinates.timeToX(exitTime);
+      const x1 = resolveTimeCoordinate(entryTime, coordinates, latestTimeNs);
+      const x2 = resolveTimeCoordinate(exitTime, coordinates, latestTimeNs);
       const entry = coordinates.priceToY(Number(drawing.entry_price_ticks) * tickSize);
       const stop = coordinates.priceToY(Number(drawing.stop_price_ticks) * tickSize);
       const target = coordinates.priceToY(Number(drawing.target_price_ticks) * tickSize);
@@ -191,6 +222,53 @@ export function buildDrawingPrimitives(
     }
   }
 
+  return output;
+}
+
+function resolveTimeCoordinate(
+  timeNs: number,
+  coordinates: ChartCoordinates,
+  latestTimeNs: number | null
+): number | null {
+  const direct = coordinates.timeToX(timeNs);
+  if (direct !== null && Number.isFinite(direct)) return direct;
+  if (latestTimeNs === null || !Number.isFinite(latestTimeNs) || timeNs < latestTimeNs) {
+    return null;
+  }
+  const latest = coordinates.timeToX(latestTimeNs);
+  return latest !== null && Number.isFinite(latest) ? latest : null;
+}
+
+function resolveLineEndCoordinate(
+  timeNs: number,
+  coordinates: ChartCoordinates,
+  latestTimeNs: number | null,
+  width: number
+): number | null {
+  const direct = coordinates.timeToX(timeNs);
+  if (direct !== null && Number.isFinite(direct)) return direct;
+  if (latestTimeNs === null || timeNs < latestTimeNs) return null;
+  return width;
+}
+
+function boundedTail(
+  drawings: Iterable<DrawingState>,
+  maximumDrawings: number
+): DrawingState[] {
+  const limit = Math.max(1, Math.floor(maximumDrawings));
+  const buffer = new Array<DrawingState>(limit);
+  let count = 0;
+  for (const drawing of drawings) {
+    buffer[count % limit] = drawing;
+    count += 1;
+  }
+  const size = Math.min(count, limit);
+  const start = count <= limit ? 0 : count % limit;
+  const output = new Array<DrawingState>(size);
+  for (let index = 0; index < size; index += 1) {
+    const value = buffer[(start + index) % limit];
+    if (value) output[index] = value;
+  }
   return output;
 }
 
@@ -289,16 +367,22 @@ function appendBrokerTradePrimitives(
   coordinates: ChartCoordinates,
   tickSize: number,
   width: number,
-  height: number
+  height: number,
+  latestTimeNs: number | null
 ): void {
   const entryTime = Number(drawing.entry_time_ns);
-  const exitTime = Number(drawing.exit_time_ns);
+  const payloadExitTime = nullableFiniteNumber(drawing.exit_time_ns);
+  const exitTime = Math.max(entryTime, payloadExitTime ?? latestTimeNs ?? entryTime);
   const entryTicks = Number(drawing.entry_price_ticks);
   const exitTicks = Number(drawing.exit_price_ticks);
   if (![entryTime, exitTime, entryTicks, exitTicks].every(Number.isFinite)) return;
 
-  const x1 = coordinates.timeToX(entryTime);
-  const x2 = coordinates.timeToX(Math.max(entryTime, exitTime));
+  const x1 = resolveTimeCoordinate(entryTime, coordinates, latestTimeNs);
+  const x2 = resolveTimeCoordinate(
+    Math.max(entryTime, exitTime),
+    coordinates,
+    latestTimeNs
+  );
   const entry = coordinates.priceToY(entryTicks * tickSize);
   const exit = coordinates.priceToY(exitTicks * tickSize);
   if (x1 === null || x2 === null || entry === null || exit === null) return;
@@ -391,7 +475,15 @@ function appendBrokerTradePrimitives(
     target !== null && Number.isFinite(target) ? target : exit,
     stop !== null && Number.isFinite(stop) ? stop : exit
   );
-  const statusLabel = `${side.toUpperCase()} · ${brokerStatusLabel(exitKind, status)} · PnL ${formatSigned(netPnl)}`;
+  const tradeDate = safeText(drawing.trade_date);
+  const chainId = safeText(drawing.chain_id);
+  const legNumber = Number(drawing.leg_number ?? 1) === 2 ? 2 : 1;
+  const identityLabel = tradeDate
+    ? `${tradeDate} · L${legNumber}`
+    : chainId
+      ? `${chainId} · L${legNumber}`
+      : `L${legNumber}`;
+  const statusLabel = `${identityLabel} · ${side.toUpperCase()} · ${brokerStatusLabel(exitKind, status)} · PnL ${formatSigned(netPnl)}`;
   output.push(labelPrimitive(x + 6, clampCoordinate(topReference + 16, 18, height - 8), statusLabel, statusColor));
   output.push(labelPrimitive(
     x + 6,

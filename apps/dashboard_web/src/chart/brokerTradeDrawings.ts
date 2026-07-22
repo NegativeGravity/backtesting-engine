@@ -14,16 +14,32 @@ export function buildBrokerTradeDrawings({
   symbol,
   trades,
   positions,
-  latestTimeNs
+  latestTimeNs: _latestTimeNs
 }: BrokerTradeDrawingInput): DrawingState[] {
-  const closed = trades
+  void _latestTimeNs;
+  return [
+    ...buildClosedTradeDrawings(symbol, trades),
+    ...buildOpenPositionDrawings(symbol, positions)
+  ];
+}
+
+export function buildClosedTradeDrawings(
+  symbol: string,
+  trades: TradeRecord[]
+): DrawingState[] {
+  return trades
     .filter(trade => trade.symbol === symbol)
     .slice(-CLOSED_TRADE_LIMIT)
     .map(toClosedTradeDrawing);
-  const open = positions
+}
+
+export function buildOpenPositionDrawings(
+  symbol: string,
+  positions: PositionRecord[]
+): DrawingState[] {
+  return positions
     .filter(position => position.symbol === symbol)
-    .map(position => toOpenPositionDrawing(position, latestTimeNs));
-  return [...closed, ...open];
+    .map(toOpenPositionDrawing);
 }
 
 export function brokerTradeIds(drawings: Iterable<DrawingState>): Set<string> {
@@ -37,6 +53,7 @@ export function brokerTradeIds(drawings: Iterable<DrawingState>): Set<string> {
 
 function toClosedTradeDrawing(trade: TradeRecord): DrawingState {
   const exitKind = normalizeExitKind(trade.exit_reason);
+  const identity = tradeIdentity(trade.entry_tags);
   return {
     drawingId: `broker-trade:${trade.trade_id}`,
     revision: 1,
@@ -46,6 +63,9 @@ function toClosedTradeDrawing(trade: TradeRecord): DrawingState {
       layer_id: "broker-trades",
       trade_id: trade.trade_id,
       position_id: trade.position_id,
+      chain_id: identity.chainId,
+      trade_date: identity.tradeDate,
+      leg_number: identity.legNumber,
       symbol: trade.symbol,
       side: trade.side,
       status: "closed",
@@ -65,25 +85,26 @@ function toClosedTradeDrawing(trade: TradeRecord): DrawingState {
   };
 }
 
-function toOpenPositionDrawing(
-  position: PositionRecord,
-  latestTimeNs: number | null
-): DrawingState {
+function toOpenPositionDrawing(position: PositionRecord): DrawingState {
   const entry = numeric(position.average_entry_price_ticks);
+  const identity = tradeIdentity(position.entry_tags);
   return {
     drawingId: `broker-position:${position.position_id}`,
-    revision: Math.max(1, Math.floor((latestTimeNs ?? position.opened_time_ns) / 1_000_000_000)),
+    revision: Math.max(1, Math.floor(position.opened_time_ns / 1_000_000_000)),
     payload: {
       kind: "broker_trade",
       drawing_id: `broker-position:${position.position_id}`,
       layer_id: "broker-trades",
       trade_id: "",
       position_id: position.position_id,
+      chain_id: identity.chainId,
+      trade_date: identity.tradeDate,
+      leg_number: identity.legNumber,
       symbol: position.symbol,
       side: position.side,
       status: "open",
       entry_time_ns: position.opened_time_ns,
-      exit_time_ns: Math.max(position.opened_time_ns, latestTimeNs ?? position.opened_time_ns),
+      exit_time_ns: null,
       entry_price_ticks: entry,
       exit_price_ticks: nullableNumeric(position.current_price_ticks) ?? entry,
       stop_price_ticks: nullableNumeric(position.stop_loss_ticks),
@@ -116,4 +137,21 @@ function nullableNumeric(value: string | number | null | undefined): number | nu
   if (value === null || value === undefined) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+interface TradeIdentity {
+  chainId: string;
+  tradeDate: string;
+  legNumber: number;
+}
+
+function tradeIdentity(tags: Record<string, string> | undefined): TradeIdentity {
+  const chainId = tags?.chain_id ?? tags?.["vex.stop_and_reverse.chain_id"] ?? "";
+  const tradeDate = tags?.trade_date ?? "";
+  const parsedLeg = Number(tags?.leg ?? "1");
+  return {
+    chainId,
+    tradeDate,
+    legNumber: parsedLeg === 2 ? 2 : 1
+  };
 }

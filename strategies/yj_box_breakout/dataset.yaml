@@ -1,23 +1,24 @@
 schema_version: 1.0.0
 dataset_id: xauusd_mt5_yj_tehran
-version: "1"
-name: XAUUSD M15 YJ Tehran Session Dataset
+version: "2"
+name: XAUUSD M15 YJ Stored-Wall-Clock Dataset
 source: mt5_csv
 root_path: data/mt5
 price_basis: bid
-source_timezone: UTC
+source_timezone: Asia/Tehran
 engine_timezone: UTC
 files:
   - symbol: XAUUSD
     timeframe: M15
     relative_path: XAUUSD_M15_202501020100_202607131315.csv
-    declared_start: 2025-01-02T01:00:00Z
-    declared_end: 2026-07-13T13:15:00Z
+    declared_start: 2025-01-02T01:00:00+03:30
+    declared_end: 2026-07-13T13:15:00+03:30
     row_count: 36038
     size_bytes: 2256757
     sha256: 68487318e173f168996e643e1670dfc3925898097ec37951dfecfcbea61d981b
 metadata:
   strategy: yj_box_breakout
   session_timezone: Asia/Tehran
-  source_clock: UTC
+  source_clock: stored_mt5_wall_clock
+  clock_mapping: raw_01_30_is_tehran_01_30
   trailing_bar_behavior: excluded_by_run_end

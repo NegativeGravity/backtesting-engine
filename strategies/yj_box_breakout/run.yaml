@@ -3,7 +3,7 @@ run_id: run_xauusd_yj_tehran_box_breakout_v2
 name: XAUUSD YJ Box Breakout With One Reversal
 strategy:
   strategy_id: yj_box_breakout
-  version: 1.1.1
+  version: 1.3.0
   instance_id: yj_box_breakout_primary
   parameters:
     symbol: XAUUSD
@@ -16,15 +16,16 @@ strategy:
     allow_long: true
     allow_short: true
     draw_box: true
-    strict_box_validation: false
+    strict_box_validation: true
+    allow_overlapping_daily_chains: true
 dataset:
   dataset_id: xauusd_mt5_yj_tehran
-  version: "1"
+  version: "2"
 symbol_profiles:
   - profile_id: yj_xauusd_fractional
     version: 1.1.0
-start_time: 2025-01-02T01:00:00Z
-end_time: 2026-07-13T13:30:00Z
+start_time: 2025-01-02T01:00:00+03:30
+end_time: 2026-07-13T13:30:00+03:30
 execution_timeframe: M15
 subscriptions:
   - symbol: XAUUSD
@@ -61,9 +62,9 @@ risk:
   default_sizing:
     mode: risk_percent
     risk_percent: "1"
-  max_open_positions: 1
-  max_symbol_positions: 1
-  allow_pyramiding: false
+  max_open_positions: 512
+  max_symbol_positions: 512
+  allow_pyramiding: true
   allow_long: true
   allow_short: true
   max_margin_usage_percent: "100"
@@ -76,7 +77,9 @@ random_seed: 42
 metadata:
   strategy_source: yj-strategy.ipynb
   source_notebook_sha256: cd2439ebdfa813c9c52d0b528f21a81c03d6ee31c856e8f67215b4087039fc23
-  timestamp_basis: Asia/Tehran
+  timestamp_basis: stored_mt5_wall_clock_mapped_to_Asia/Tehran
   session_timezone: Asia/Tehran
   two_sided_breakout: "true"
+  overlapping_daily_chains: "true"
+  notebook_parallel_extension: "true"
   close_open_positions_at_end: "true"

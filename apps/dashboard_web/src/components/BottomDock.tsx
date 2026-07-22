@@ -42,8 +42,9 @@ export const BottomDock = memo(function BottomDock({
   account,
   tickSize
 }: Props) {
-  const events = useMemo(() => timeline.filter(item => item.kind !== "strategy_log").slice(-MAX_DOCK_ROWS), [timeline]);
-  const logs = useMemo(() => timeline.filter(item => item.kind === "strategy_log").slice(-MAX_DOCK_ROWS), [timeline]);
+  const partitionedTimeline = useMemo(() => recentTimelineRows(timeline), [timeline]);
+  const events = partitionedTimeline.events;
+  const logs = partitionedTimeline.logs;
   return (
     <section className="bottom-dock">
       <nav className="dock-tabs">
@@ -66,6 +67,25 @@ export const BottomDock = memo(function BottomDock({
     </section>
   );
 });
+
+
+function recentTimelineRows(timeline: ReplayTimelineItem[]): {
+  events: ReplayTimelineItem[];
+  logs: ReplayTimelineItem[];
+} {
+  const events: ReplayTimelineItem[] = [];
+  const logs: ReplayTimelineItem[] = [];
+  for (let index = timeline.length - 1; index >= 0; index -= 1) {
+    const item = timeline[index];
+    if (!item) continue;
+    const target = item.kind === "strategy_log" ? logs : events;
+    if (target.length < MAX_DOCK_ROWS) target.push(item);
+    if (events.length >= MAX_DOCK_ROWS && logs.length >= MAX_DOCK_ROWS) break;
+  }
+  events.reverse();
+  logs.reverse();
+  return { events, logs };
+}
 
 function TradesTable({ trades, currency, tickSize }: { trades: TradeRecord[]; currency: string; tickSize: number }) {
   if (trades.length === 0) return <EmptyTable text="No completed trades at the current replay position" />;
@@ -152,8 +172,8 @@ function LogsTable({ timeline }: { timeline: ReplayTimelineItem[] }) {
   );
 }
 
-function PerformancePanel({ trades, metrics, currency }: { trades: TradeRecord[]; metrics: ReplayMetrics; currency: string }) {
-  const months = monthlyPerformance(trades);
+const PerformancePanel = memo(function PerformancePanel({ trades, metrics, currency }: { trades: TradeRecord[]; metrics: ReplayMetrics; currency: string }) {
+  const months = useMemo(() => monthlyPerformance(trades), [trades]);
   return (
     <div className="performance-panel">
       <div className="performance-summary">
@@ -185,7 +205,7 @@ function PerformancePanel({ trades, metrics, currency }: { trades: TradeRecord[]
       </div>
     </div>
   );
-}
+});
 
 function EmptyTable({ text }: { text: string }) {
   return <div className="empty-table">{text}</div>;

@@ -41,6 +41,24 @@ export class ReplayBarBuffer {
     for (const bar of normalized) this.pushUnchecked(bar);
   }
 
+  prepend(bars: ReplayBar[]): boolean {
+    if (bars.length === 0) return false;
+    const incoming = normalizeBars(bars);
+    if (incoming.length === 0) return false;
+    const current = this.toArray();
+    const merged = new Map<number, ReplayBar>();
+    for (const bar of incoming) merged.set(bar.sequence, bar);
+    for (const bar of current) merged.set(bar.sequence, bar);
+    const ordered = [...merged.values()].sort((left, right) => left.sequence - right.sequence);
+    const bounded = ordered.length <= this.capacity
+      ? ordered
+      : ordered.slice(0, this.capacity);
+    const beforeFirst = this.first?.sequence ?? null;
+    const beforeLast = this.last?.sequence ?? null;
+    this.replace(bounded);
+    return beforeFirst !== this.first?.sequence || beforeLast !== this.last?.sequence;
+  }
+
   append(bars: ReplayBar[]): ReplayBarAppendResult {
     if (bars.length === 0) {
       return {

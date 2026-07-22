@@ -375,6 +375,7 @@ export default function App() {
       <div className="workspace">
         <main className="chart-workspace">
           <TradingChart
+            runId={bootstrap.run.run_id}
             bars={bootstrap.bars}
             chartState={state.chartState}
             tickSize={tickSize}

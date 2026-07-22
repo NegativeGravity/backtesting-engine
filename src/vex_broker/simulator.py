@@ -895,9 +895,14 @@ class BrokerSimulator:
             if request.side is Side.BUY
             else entry_ticks - target_distance
         )
+        sizing_capital = (
+            self.state.account.balance
+            if instruction.account_basis == "balance"
+            else self.state.account.equity
+        )
         volume = PositionSizer.size(
             self.run_config.risk.default_sizing,
-            self.state.account.equity,
+            sizing_capital,
             entry_ticks,
             stop_ticks,
             self.symbol_profiles[request.symbol],
@@ -1160,6 +1165,8 @@ class BrokerSimulator:
             average_entry_price_ticks=Decimal(price_ticks),
             opened_time_ns=cast(int, order.terminal_time_ns),
             entry_order_id=order.order_id,
+            entry_client_order_id=request.client_order_id,
+            entry_tags=dict(request.tags),
             stop_loss_ticks=request.stop_loss_ticks,
             take_profit_ticks=request.take_profit_ticks,
             entry_commission=commission,
@@ -1427,6 +1434,8 @@ class BrokerSimulator:
                     reversal.reverse_stop_ticks,
                     reversal.reward_risk,
                     reversal.chain_id,
+                    reversal.account_basis,
+                    entry_order.request.tags,
                     resolved,
                     bar.close_time_ns,
                     fills,
@@ -1444,6 +1453,8 @@ class BrokerSimulator:
         reverse_stop_ticks: int,
         reward_risk: Decimal,
         chain_id: str | None,
+        account_basis: str,
+        source_tags: dict[str, str],
         resolved: ResolvedBar,
         time_ns: int,
         fills: list[Fill],
@@ -1471,9 +1482,14 @@ class BrokerSimulator:
         )
         profile = self.symbol_profiles[closed_position.symbol]
         try:
+            sizing_capital = (
+                self.state.account.balance
+                if account_basis == "balance"
+                else self.state.account.equity
+            )
             volume = PositionSizer.size(
                 self.run_config.risk.default_sizing,
-                self.state.account.equity,
+                sizing_capital,
                 entry_ticks,
                 reverse_stop_ticks,
                 profile,
@@ -1482,11 +1498,20 @@ class BrokerSimulator:
         except OrderRejectedError:
             return ()
         tags = {
-            "broker_generated": "stop_and_reverse",
-            "leg": "2",
+            key: value
+            for key, value in source_tags.items()
+            if key in {"strategy", "chain_id", "trade_date"}
         }
+        tags.update(
+            {
+                "broker_generated": "stop_and_reverse",
+                "leg": "2",
+                "direction": "long" if reverse_side is Side.BUY else "short",
+            }
+        )
         if chain_id is not None:
             tags[STOP_AND_REVERSE_CHAIN_ID_TAG] = chain_id
+            tags["chain_id"] = chain_id
         request = OrderRequest(
             client_order_id=self._ids.next("stop_and_reverse_client"),
             run_id=closed_position.run_id,
@@ -1770,6 +1795,9 @@ class BrokerSimulator:
             exit_time_ns=time_ns,
             entry_price_ticks=position.average_entry_price_ticks,
             exit_price_ticks=Decimal(exit_price_ticks),
+            entry_order_id=position.entry_order_id,
+            entry_client_order_id=position.entry_client_order_id,
+            entry_tags=dict(position.entry_tags),
             stop_loss_ticks=position.stop_loss_ticks,
             take_profit_ticks=position.take_profit_ticks,
             gross_pnl=gross_pnl,
@@ -1795,6 +1823,9 @@ class BrokerSimulator:
             volume_lots=volume,
             average_entry_price_ticks=position.average_entry_price_ticks,
             opened_time_ns=position.opened_time_ns,
+            entry_order_id=position.entry_order_id,
+            entry_client_order_id=position.entry_client_order_id,
+            entry_tags=dict(position.entry_tags),
             current_price_ticks=exit_price_ticks,
             stop_loss_ticks=position.stop_loss_ticks,
             take_profit_ticks=position.take_profit_ticks,
@@ -2119,6 +2150,9 @@ class BrokerSimulator:
             volume_lots=state.volume_lots,
             average_entry_price_ticks=state.average_entry_price_ticks,
             opened_time_ns=state.opened_time_ns,
+            entry_order_id=state.entry_order_id,
+            entry_client_order_id=state.entry_client_order_id,
+            entry_tags=dict(state.entry_tags),
             current_price_ticks=state.current_price_ticks,
             stop_loss_ticks=state.stop_loss_ticks,
             take_profit_ticks=state.take_profit_ticks,

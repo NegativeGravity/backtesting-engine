@@ -1,5 +1,5 @@
 import type { ReplayBar } from "../lib/types";
-import type { ChartAdapter, ChartCoordinates } from "./ChartAdapter";
+import type { ChartAdapter, ChartCoordinates, ChartRenderReason, VisibleTimeRangeNs } from "./ChartAdapter";
 import type { MaterializedChartState } from "./chartState";
 import type {
   CapturedTimeViewport,
@@ -30,6 +30,12 @@ export class AdvancedChartsAdapter implements ChartAdapter {
     return null;
   }
 
+  visibleTimeRangeNs(): VisibleTimeRangeNs | null {
+    return null;
+  }
+
+  setVisibleTimeRangeNs(_range: VisibleTimeRangeNs): void {}
+
   fitContent(): void {}
 
   coordinates(): ChartCoordinates {
@@ -39,7 +45,7 @@ export class AdvancedChartsAdapter implements ChartAdapter {
     };
   }
 
-  subscribeRender(): () => void {
+  subscribeRender(_handler: (reason: ChartRenderReason) => void): () => void {
     return () => undefined;
   }
 }

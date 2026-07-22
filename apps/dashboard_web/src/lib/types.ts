@@ -113,6 +113,9 @@ export interface PositionRecord {
   volume_lots: string;
   average_entry_price_ticks: string;
   opened_time_ns: number;
+  entry_order_id?: string | null;
+  entry_client_order_id?: string | null;
+  entry_tags?: Record<string, string>;
   current_price_ticks: number | null;
   stop_loss_ticks: number | null;
   take_profit_ticks: number | null;
@@ -143,6 +146,9 @@ export interface TradeRecord {
   exit_time_ns: number;
   entry_price_ticks: string;
   exit_price_ticks: string;
+  entry_order_id?: string | null;
+  entry_client_order_id?: string | null;
+  entry_tags?: Record<string, string>;
   stop_loss_ticks: number | null;
   take_profit_ticks: number | null;
   gross_pnl: string;

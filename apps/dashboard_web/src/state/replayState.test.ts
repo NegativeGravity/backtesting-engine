@@ -241,9 +241,9 @@ describe("replayReducer", () => {
       type: "bootstrap_received",
       bootstrap: oversized
     });
-    expect(state.timeline).toHaveLength(5_000);
-    expect(state.bootstrap?.timeline).toHaveLength(5_000);
-    expect(state.bootstrap?.fills).toHaveLength(5_000);
+    expect(state.timeline).toHaveLength(1_500);
+    expect(state.bootstrap?.timeline).toHaveLength(1_500);
+    expect(state.bootstrap?.fills).toHaveLength(1_500);
   });
 
   it("keeps chart buffers stable while UI state advances", () => {
@@ -330,4 +330,36 @@ it("refreshes live orders and positions from account snapshot events", () => {
   expect(state.positions).toHaveLength(1);
   expect(state.positions[0]?.current_price_ticks).toBe(250125);
   expect(state.positions[0]?.unrealized_pnl).toBe("12.5");
+});
+
+it("preserves broker collection references for identical account snapshots", () => {
+  const initial = replayReducer(initialReplayState, {
+    type: "bootstrap_received",
+    bootstrap
+  });
+  const frame = {
+    frame_type: "advance",
+    cursor_sequence: 2,
+    cursor_time_ns: 2,
+    progress: "0.2",
+    playing: true,
+    speed: "100",
+    bars: [],
+    timeline: [{
+      sequence: 20,
+      time_ns: 2,
+      kind: "broker_event",
+      payload: {
+        event_type: "account.updated",
+        payload: { orders: [], positions: [] }
+      }
+    }],
+    account: null
+  } satisfies ReplayFrame;
+
+  const next = replayReducer(initial, { type: "frame_received", frame });
+
+  expect(next.orders).toBe(initial.orders);
+  expect(next.positions).toBe(initial.positions);
+  expect(next.trades).toBe(initial.trades);
 });

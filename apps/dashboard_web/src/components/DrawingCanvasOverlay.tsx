@@ -2,12 +2,19 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
-  useRef
+  useRef,
+  useState
 } from "react";
 import type { LightweightChartsAdapter } from "../chart/LightweightChartsAdapter";
 import { buildDrawingPrimitives } from "../chart/drawingPrimitives";
 import { drawCanvasPrimitives } from "../chart/drawCanvasPrimitives";
-import type { DrawingState } from "../chart/chartState";
+import type { DrawingQueryResult } from "../chart/DrawingViewportIndex";
+import {
+  DRAWING_DATA_FRAME_INTERVAL_MS,
+  DRAWING_STATS_INTERVAL_MS,
+  DRAWING_VIEWPORT_FRAME_INTERVAL_MS
+} from "../chart/performanceLimits";
+import type { VisibleTimeRangeNs } from "../chart/ChartAdapter";
 import type { DrawingWorkerCommand, DrawingWorkerEvent } from "../lib/drawingProtocol";
 
 export interface DrawingCanvasController {
@@ -15,33 +22,67 @@ export interface DrawingCanvasController {
   clear(): void;
 }
 
-interface Props {
-  adapter: LightweightChartsAdapter;
-  getDrawings: () => Iterable<DrawingState>;
-  tickSize: number;
+export interface DrawingRenderStats {
+  totalDrawings: number;
+  matchedDrawings: number;
+  renderedDrawings: number;
+  primitiveCount: number;
+  buildTimeMs: number;
 }
 
+interface Props {
+  adapter: LightweightChartsAdapter;
+  getDrawings: (range: VisibleTimeRangeNs | null) => DrawingQueryResult;
+  getLatestTimeNs: () => number | null;
+  tickSize: number;
+  onStats?: (stats: DrawingRenderStats) => void;
+}
+
+type InvalidationMode = "data" | "viewport" | "content";
+
 export const DrawingCanvasOverlay = forwardRef<DrawingCanvasController, Props>(
-  function DrawingCanvasOverlay({ adapter, getDrawings, tickSize }, forwardedRef) {
+  function DrawingCanvasOverlay(
+    { adapter, getDrawings, getLatestTimeNs, tickSize, onStats },
+    forwardedRef
+  ) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [rendererGeneration, setRendererGeneration] = useState(0);
+    const [forceMainThread, setForceMainThread] = useState(false);
     const adapterRef = useRef(adapter);
     const getDrawingsRef = useRef(getDrawings);
+    const getLatestTimeNsRef = useRef(getLatestTimeNs);
     const tickSizeRef = useRef(tickSize);
+    const onStatsRef = useRef(onStats);
     const workerRef = useRef<Worker | null>(null);
     const workerReadyRef = useRef(false);
     const workerBusyRef = useRef(false);
     const dirtyRef = useRef(true);
+    const pendingModeRef = useRef<InvalidationMode>("content");
     const frameRef = useRef<number | null>(null);
+    const timerRef = useRef<number | null>(null);
+    const scheduledForRef = useRef(Number.POSITIVE_INFINITY);
     const revisionRef = useRef(0);
+    const lastDrawAtRef = useRef(0);
+    const lastStatsAtRef = useRef(0);
     const sizeRef = useRef({ width: 1, height: 1, devicePixelRatio: 1 });
     const contextRef = useRef<CanvasRenderingContext2D | null>(null);
 
     adapterRef.current = adapter;
     getDrawingsRef.current = getDrawings;
+    getLatestTimeNsRef.current = getLatestTimeNs;
     tickSizeRef.current = tickSize;
+    onStatsRef.current = onStats;
 
     const postWorker = (command: DrawingWorkerCommand, transfer: Transferable[] = []) => {
       workerRef.current?.postMessage(command, transfer);
+    };
+
+    const clearScheduledDraw = () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+      timerRef.current = null;
+      frameRef.current = null;
+      scheduledForRef.current = Number.POSITIVE_INFINITY;
     };
 
     const renderLatest = () => {
@@ -52,14 +93,32 @@ export const DrawingCanvasOverlay = forwardRef<DrawingCanvasController, Props>(
       if (width <= 1 || height <= 1) return;
 
       dirtyRef.current = false;
+      pendingModeRef.current = "data";
+      const startedAt = performance.now();
+      const query = getDrawingsRef.current(adapterRef.current.visibleTimeRangeNs());
       const primitives = buildDrawingPrimitives(
-        getDrawingsRef.current(),
+        query.drawings,
         adapterRef.current.coordinates(),
         tickSizeRef.current,
         width,
-        height
+        height,
+        getLatestTimeNsRef.current()
       );
+      const finishedAt = performance.now();
+      lastDrawAtRef.current = finishedAt;
       revisionRef.current += 1;
+
+      const statsHandler = onStatsRef.current;
+      if (statsHandler && finishedAt - lastStatsAtRef.current >= DRAWING_STATS_INTERVAL_MS) {
+        lastStatsAtRef.current = finishedAt;
+        statsHandler({
+          totalDrawings: query.totalCount,
+          matchedDrawings: query.matchedCount,
+          renderedDrawings: query.drawings.length,
+          primitiveCount: primitives.length,
+          buildTimeMs: finishedAt - startedAt
+        });
+      }
 
       if (workerRef.current && workerReadyRef.current) {
         workerBusyRef.current = true;
@@ -75,16 +134,37 @@ export const DrawingCanvasOverlay = forwardRef<DrawingCanvasController, Props>(
       if (context) drawCanvasPrimitives(context, primitives, width, height);
     };
 
-    const scheduleDraw = () => {
+    const scheduleDraw = (mode: InvalidationMode = "content") => {
       dirtyRef.current = true;
-      if (frameRef.current !== null) return;
-      frameRef.current = window.requestAnimationFrame(() => {
-        frameRef.current = null;
-        renderLatest();
-      });
+      if (invalidationPriority(mode) > invalidationPriority(pendingModeRef.current)) {
+        pendingModeRef.current = mode;
+      }
+      if (workerBusyRef.current) return;
+
+      const now = performance.now();
+      const interval = invalidationInterval(pendingModeRef.current);
+      const target = pendingModeRef.current === "content"
+        ? now
+        : Math.max(now, lastDrawAtRef.current + interval);
+      if (scheduledForRef.current <= target) return;
+
+      clearScheduledDraw();
+      scheduledForRef.current = target;
+      const launch = () => {
+        timerRef.current = null;
+        frameRef.current = window.requestAnimationFrame(() => {
+          frameRef.current = null;
+          scheduledForRef.current = Number.POSITIVE_INFINITY;
+          renderLatest();
+        });
+      };
+      const delay = Math.max(0, target - now);
+      if (delay <= 1) launch();
+      else timerRef.current = window.setTimeout(launch, delay);
     };
 
     const clear = () => {
+      clearScheduledDraw();
       dirtyRef.current = false;
       if (workerRef.current && workerReadyRef.current) {
         postWorker({ type: "clear" });
@@ -95,14 +175,28 @@ export const DrawingCanvasOverlay = forwardRef<DrawingCanvasController, Props>(
       }
     };
 
-    useImperativeHandle(forwardedRef, () => ({ invalidate: scheduleDraw, clear }));
+    useImperativeHandle(forwardedRef, () => ({
+      invalidate: () => scheduleDraw("content"),
+      clear
+    }));
 
     useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
       let worker: Worker | null = null;
+      let recovering = false;
+      const fallBackToMainThread = (detail: string) => {
+        if (recovering) return;
+        recovering = true;
+        console.warn("Drawing worker unavailable; switching to main-thread rendering", detail);
+        workerBusyRef.current = false;
+        workerReadyRef.current = false;
+        setForceMainThread(true);
+        setRendererGeneration(value => value + 1);
+      };
       const canUseOffscreen =
+        !forceMainThread &&
         typeof Worker !== "undefined" &&
         "transferControlToOffscreen" in canvas;
 
@@ -118,20 +212,18 @@ export const DrawingCanvasOverlay = forwardRef<DrawingCanvasController, Props>(
             const message = event.data as DrawingWorkerEvent;
             if (message.type === "ready") {
               workerReadyRef.current = true;
-              scheduleDraw();
+              scheduleDraw("content");
               return;
             }
             if (message.type === "drawn") {
               workerBusyRef.current = false;
-              if (dirtyRef.current) scheduleDraw();
+              if (dirtyRef.current) scheduleDraw(pendingModeRef.current);
               return;
             }
-            console.error("Drawing worker failed", message.detail);
-            workerBusyRef.current = false;
+            fallBackToMainThread(message.detail);
           };
           worker.onerror = event => {
-            console.error("Drawing worker crashed", event.message);
-            workerBusyRef.current = false;
+            fallBackToMainThread(event.message);
           };
           const { width, height, devicePixelRatio } = sizeRef.current;
           postWorker(
@@ -139,9 +231,13 @@ export const DrawingCanvasOverlay = forwardRef<DrawingCanvasController, Props>(
             [offscreen]
           );
         } catch (error) {
-          console.warn("Offscreen drawing renderer unavailable, using main-thread canvas", error);
-          workerRef.current = null;
-          contextRef.current = canvas.getContext("2d", { alpha: true, desynchronized: true });
+          fallBackToMainThread(error instanceof Error ? error.message : String(error));
+          return () => {
+            worker?.terminate();
+            workerRef.current = null;
+            workerReadyRef.current = false;
+            workerBusyRef.current = false;
+          };
         }
       } else {
         contextRef.current = canvas.getContext("2d", { alpha: true, desynchronized: true });
@@ -163,39 +259,60 @@ export const DrawingCanvasOverlay = forwardRef<DrawingCanvasController, Props>(
           canvas.style.height = `${height}px`;
           contextRef.current?.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         }
-        scheduleDraw();
+        scheduleDraw("viewport");
       };
 
       const resizeObserver = new ResizeObserver(resize);
       resizeObserver.observe(canvas);
       resize();
-      scheduleDraw();
+      scheduleDraw("content");
 
       return () => {
         resizeObserver.disconnect();
-        if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
-        frameRef.current = null;
+        clearScheduledDraw();
         worker?.terminate();
         workerRef.current = null;
         workerReadyRef.current = false;
         workerBusyRef.current = false;
         contextRef.current = null;
       };
-    }, []);
+    }, [forceMainThread, rendererGeneration]);
 
     useEffect(() => {
       adapterRef.current = adapter;
-      const unsubscribe = adapter.subscribeRender(scheduleDraw);
-      scheduleDraw();
+      const unsubscribe = adapter.subscribeRender(reason => {
+        scheduleDraw(reason === "data" ? "data" : reason === "strategy" ? "content" : "viewport");
+      });
+      scheduleDraw("content");
       return unsubscribe;
     }, [adapter]);
 
     useEffect(() => {
       getDrawingsRef.current = getDrawings;
+      getLatestTimeNsRef.current = getLatestTimeNs;
       tickSizeRef.current = tickSize;
-      scheduleDraw();
-    }, [getDrawings, tickSize]);
+      scheduleDraw("content");
+    }, [getDrawings, getLatestTimeNs, tickSize]);
 
-    return <canvas ref={canvasRef} className="drawing-canvas-overlay" aria-hidden="true" />;
+    return (
+      <canvas
+        key={rendererGeneration}
+        ref={canvasRef}
+        className="drawing-canvas-overlay"
+        aria-hidden="true"
+      />
+    );
   }
 );
+
+function invalidationInterval(mode: InvalidationMode): number {
+  if (mode === "data") return DRAWING_DATA_FRAME_INTERVAL_MS;
+  if (mode === "viewport") return DRAWING_VIEWPORT_FRAME_INTERVAL_MS;
+  return 0;
+}
+
+function invalidationPriority(mode: InvalidationMode): number {
+  if (mode === "content") return 3;
+  if (mode === "viewport") return 2;
+  return 1;
+}

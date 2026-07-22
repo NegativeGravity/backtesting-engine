@@ -8,10 +8,12 @@ import pytest
 from strategies.yj_box_breakout.strategy import (
     ENTRY_REEVALUATE_AFTER_FLAT_TAG,
     ENTRY_REQUIRE_FLAT_TAG,
+    EXECUTION_ACCOUNT_BASIS_TAG,
     EXECUTION_REWARD_RISK_TAG,
     EXECUTION_RISK_REWARD_ENABLED_TAG,
     INTRABAR_ENTRY_TARGET_ALLOWED_TAG,
     OCO_AMBIGUOUS_POLICY_TAG,
+    STOP_AND_REVERSE_ACCOUNT_BASIS_TAG,
     STOP_AND_REVERSE_ENABLED_TAG,
     YjBoxBreakoutParameters,
     YjBoxBreakoutStrategy,
@@ -76,6 +78,7 @@ def test_yj_parameters_preserve_notebook_defaults() -> None:
     assert parameters.session_timezone == "Asia/Tehran"
     assert parameters.allow_long is True
     assert parameters.allow_short is True
+    assert parameters.allow_overlapping_daily_chains is True
 
 
 def test_yj_dataset_and_session_clocks_are_explicit(project_root: Path) -> None:
@@ -84,13 +87,16 @@ def test_yj_dataset_and_session_clocks_are_explicit(project_root: Path) -> None:
     run, descriptor, _, _ = load_context_models(project_root)
 
     assert dataset.dataset_id == "xauusd_mt5_yj_tehran"
-    assert dataset.source_timezone == "UTC"
+    assert dataset.source_timezone == "Asia/Tehran"
     assert len(dataset.files) == 1
     assert dataset.files[0].timeframe is Timeframe.M15
     assert run.dataset.dataset_id == dataset.dataset_id
-    assert run.dataset.version == dataset.version
+    assert run.dataset.version == dataset.version == "2"
     assert run.strategy.parameters["session_timezone"] == "Asia/Tehran"
-    assert descriptor.version == "1.1.0"
+    assert run.strategy.parameters["strict_box_validation"] is True
+    assert run.start_time.isoformat() == "2025-01-02T01:00:00+03:30"
+    assert run.end_time.isoformat() == "2026-07-13T13:30:00+03:30"
+    assert descriptor.version == "1.3.0"
 
 
 def test_yj_run_uses_notebook_parity_execution_profile(project_root: Path) -> None:
@@ -99,6 +105,9 @@ def test_yj_run_uses_notebook_parity_execution_profile(project_root: Path) -> No
     assert run.account.leverage == Decimal("1000000")
     assert run.account.allow_negative_balance is True
     assert run.risk.max_margin_usage_percent == Decimal("100")
+    assert run.risk.max_open_positions == 512
+    assert run.risk.max_symbol_positions == 512
+    assert run.risk.allow_pyramiding is True
     assert run.execution.spread.points == 0
     assert run.execution.commission.mode.value == "none"
     assert profile.digits == 3
@@ -107,6 +116,50 @@ def test_yj_run_uses_notebook_parity_execution_profile(project_root: Path) -> No
     assert profile.volume_min == Decimal("0.000000000001")
     assert profile.volume_step == Decimal("0.000000000001")
     assert profile.volume_max == Decimal("1000000000000")
+
+
+def test_yj_draws_forming_box_before_session_is_complete(project_root: Path) -> None:
+    run, descriptor, runtime, profile = load_context_models(project_root)
+    broker = BrokerSimulator(run, {"XAUUSD": profile})
+    parameters = YjBoxBreakoutParameters.model_validate(run.strategy.parameters)
+    strategy = YjBoxBreakoutStrategy(parameters.model_dump(mode="json"))
+    context = StrategyContext(
+        run,
+        descriptor,
+        runtime,
+        parameters,
+        broker.state_snapshot,
+    )
+    context.update_cycle(ns(run.start_time), (), (), broker.state_snapshot, ())
+    context.begin_callback()
+    strategy.on_start(context)
+    context.drain()
+
+    opened = datetime(2025, 1, 3, 1, 30, tzinfo=TEHRAN).astimezone(UTC)
+    bar = make_box_bar(0, opened)
+    context.update_cycle(bar.close_time_ns, (bar,), (), broker.state_snapshot, ())
+    context.begin_callback()
+    strategy.on_bar(context, bar)
+    output = context.drain()
+
+    assert len(output.chart_commands) == 3
+    commands = [command.model_dump(mode="json") for command in output.chart_commands]
+    drawing_ids = {
+        str(command.get("drawing", {}).get("drawing_id", ""))
+        for command in commands
+        if command.get("command_type") == "upsert_drawing"
+    }
+    assert drawing_ids == {
+        "yj.box.2025-01-03",
+        "yj.box.high.2025-01-03",
+        "yj.box.low.2025-01-03",
+    }
+    rectangle = next(
+        command["drawing"]
+        for command in commands
+        if command.get("drawing", {}).get("kind") == "rectangle"
+    )
+    assert "FORMING" in str(rectangle["label"])
 
 
 def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
@@ -158,8 +211,10 @@ def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
     assert long_intent.tags[STOP_AND_REVERSE_ENABLED_TAG] == "true"
     assert long_intent.tags[EXECUTION_RISK_REWARD_ENABLED_TAG] == "true"
     assert long_intent.tags[EXECUTION_REWARD_RISK_TAG] == "1.5"
-    assert long_intent.tags[ENTRY_REQUIRE_FLAT_TAG] == "true"
-    assert long_intent.tags[ENTRY_REEVALUATE_AFTER_FLAT_TAG] == "true"
+    assert long_intent.tags[EXECUTION_ACCOUNT_BASIS_TAG] == "balance"
+    assert long_intent.tags[STOP_AND_REVERSE_ACCOUNT_BASIS_TAG] == "balance"
+    assert ENTRY_REQUIRE_FLAT_TAG not in long_intent.tags
+    assert ENTRY_REEVALUATE_AFTER_FLAT_TAG not in long_intent.tags
     assert long_intent.tags[INTRABAR_ENTRY_TARGET_ALLOWED_TAG] == "true"
 
     assert short_intent.order_type is OrderType.STOP
@@ -172,8 +227,10 @@ def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
     assert short_intent.tags[STOP_AND_REVERSE_ENABLED_TAG] == "true"
     assert short_intent.tags[EXECUTION_RISK_REWARD_ENABLED_TAG] == "true"
     assert short_intent.tags[EXECUTION_REWARD_RISK_TAG] == "1.5"
-    assert short_intent.tags[ENTRY_REQUIRE_FLAT_TAG] == "true"
-    assert short_intent.tags[ENTRY_REEVALUATE_AFTER_FLAT_TAG] == "true"
+    assert short_intent.tags[EXECUTION_ACCOUNT_BASIS_TAG] == "balance"
+    assert short_intent.tags[STOP_AND_REVERSE_ACCOUNT_BASIS_TAG] == "balance"
+    assert ENTRY_REQUIRE_FLAT_TAG not in short_intent.tags
+    assert ENTRY_REEVALUATE_AFTER_FLAT_TAG not in short_intent.tags
     assert short_intent.tags[INTRABAR_ENTRY_TARGET_ALLOWED_TAG] == "true"
     assert long_intent.tags["vex.oco.group"] == short_intent.tags["vex.oco.group"]
     tehran_midnight = datetime(2025, 1, 4, tzinfo=TEHRAN).astimezone(UTC)
@@ -234,7 +291,7 @@ def test_notebook_parity_rejects_single_direction_configuration() -> None:
         YjBoxBreakoutParameters(allow_short=False)
 
 
-def test_partial_tehran_box_fails_on_session_rollover(project_root: Path) -> None:
+def test_partial_tehran_box_fails_in_exact_parity_mode(project_root: Path) -> None:
     run, descriptor, runtime, profile = load_context_models(project_root)
     broker = BrokerSimulator(run, {"XAUUSD": profile})
     parameters = YjBoxBreakoutParameters.model_validate(run.strategy.parameters)
@@ -267,3 +324,48 @@ def test_partial_tehran_box_fails_on_session_rollover(project_root: Path) -> Non
     context.begin_callback()
     with pytest.raises(RuntimeError, match="incomplete Tehran 01:30-03:30 box"):
         strategy.on_bar(context, next_day)
+
+
+def test_completed_box_metadata_survives_strategy_state_pruning(project_root: Path) -> None:
+    run, descriptor, runtime, profile = load_context_models(project_root)
+    broker = BrokerSimulator(run, {"XAUUSD": profile})
+    parameters = YjBoxBreakoutParameters.model_validate(run.strategy.parameters)
+    strategy = YjBoxBreakoutStrategy(parameters.model_dump(mode="json"))
+    context = StrategyContext(
+        run,
+        descriptor,
+        runtime,
+        parameters,
+        broker.state_snapshot,
+    )
+    context.update_cycle(ns(run.start_time), (), (), broker.state_snapshot, ())
+    context.begin_callback()
+    strategy.on_start(context)
+    context.drain()
+
+    start = datetime(2025, 1, 3, 1, 30, tzinfo=TEHRAN).astimezone(UTC)
+    for sequence in range(8):
+        bar = make_box_bar(sequence, start + timedelta(minutes=15 * sequence))
+        context.update_cycle(bar.close_time_ns, (bar,), (), broker.state_snapshot, ())
+        context.begin_callback()
+        strategy.on_bar(context, bar)
+        context.drain()
+
+    trade_date = datetime(2025, 1, 3, tzinfo=TEHRAN).date()
+    assert trade_date in strategy._boxes
+    strategy._prune_state(trade_date + timedelta(days=90))
+    assert trade_date in strategy._boxes
+
+    context.begin_callback()
+    strategy._redraw_audit_box(context, trade_date)
+    output = context.drain()
+    drawing_ids = {
+        command.model_dump(mode="json")["drawing"]["drawing_id"]
+        for command in output.chart_commands
+        if command.model_dump(mode="json").get("command_type") == "upsert_drawing"
+    }
+    assert drawing_ids == {
+        "yj.box.2025-01-03",
+        "yj.box.high.2025-01-03",
+        "yj.box.low.2025-01-03",
+    }
