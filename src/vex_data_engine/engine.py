@@ -279,7 +279,7 @@ class Mt5DataEngine:
             symbol=manifest_file.symbol,
             timeframe=manifest_file.timeframe,
             source_path=source_path.relative_to(self.project_root).as_posix(),
-            delimiter="\t" if summary.delimiter == "\t" else summary.delimiter,
+            delimiter="\\t" if summary.delimiter == "\t" else summary.delimiter,
             source_row_count=summary.source_row_count,
             output_row_count=summary.output_row_count,
             complete_row_count=summary.complete_row_count,

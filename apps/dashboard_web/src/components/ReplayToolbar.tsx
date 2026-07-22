@@ -78,7 +78,7 @@ export const ReplayToolbar = memo(function ReplayToolbar({
         <Clock3 size={14} />
         <div>
           <strong>{formatDateTime(cursorTimeNs)}</strong>
-          <span>UTC · deterministic close-batch replay</span>
+          <span>Chart Asia/Tehran · engine UTC deterministic replay</span>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import ClassVar
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -72,9 +73,11 @@ class YjBoxBreakoutParameters(BaseModel):
     box_end_minute: int = Field(default=210, ge=1, le=1440)
     expected_box_bars: int = Field(default=8, ge=1, le=96)
     reward_risk_ratio: Decimal = Field(default=Decimal("1.5"), gt=0)
+    session_timezone: str = Field(default="Asia/Tehran", min_length=1, max_length=128)
     allow_long: bool = True
     allow_short: bool = True
     draw_box: bool = True
+    strict_box_validation: bool = True
 
     @model_validator(mode="after")
     def validate_strategy(self) -> YjBoxBreakoutParameters:
@@ -87,8 +90,12 @@ class YjBoxBreakoutParameters(BaseModel):
             raise ValueError("box duration must be divisible by 15 minutes")
         if duration // 15 != self.expected_box_bars:
             raise ValueError("expected_box_bars must match the configured box duration")
-        if not self.allow_long and not self.allow_short:
-            raise ValueError("at least one trade direction must be enabled")
+        if not self.allow_long or not self.allow_short:
+            raise ValueError("notebook parity requires both long and short breakouts")
+        try:
+            ZoneInfo(self.session_timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("session_timezone must be a valid IANA timezone") from exc
         return self
 
 
@@ -103,6 +110,8 @@ class YjBoxBreakoutStrategy(Strategy):
         self._position_visuals: dict[str, TradeVisualState] = {}
         self._awaiting_reversal: tuple[date, str] | None = None
         self._chain_sequence = 0
+        self._session_zone = ZoneInfo(self.config.session_timezone)
+        self._last_trade_date: date | None = None
 
     @property
     def config(self) -> YjBoxBreakoutParameters:
@@ -118,6 +127,9 @@ class YjBoxBreakoutStrategy(Strategy):
             box_end_minute=self.config.box_end_minute,
             expected_box_bars=self.config.expected_box_bars,
             reward_risk=float(self.config.reward_risk_ratio),
+            session_timezone=self.config.session_timezone,
+            two_sided_breakout=self.config.allow_long and self.config.allow_short,
+            strict_box_validation=self.config.strict_box_validation,
         )
 
     def on_bar(self, context: StrategyContext, bar: Bar) -> None:
@@ -128,9 +140,12 @@ class YjBoxBreakoutStrategy(Strategy):
             config.symbol
         ):
             self._awaiting_reversal = None
-        opened = self._datetime(bar.open_time_ns)
+        opened = self._session_datetime(bar.open_time_ns)
         trade_date = opened.date()
         minute = opened.hour * 60 + opened.minute
+        if self._last_trade_date is not None and trade_date != self._last_trade_date:
+            self._validate_box_session(context, self._last_trade_date)
+        self._last_trade_date = trade_date
         self._prune_state(trade_date)
         if config.box_start_minute <= minute < config.box_end_minute:
             day_bars = self._bars_by_date.setdefault(trade_date, {})
@@ -152,6 +167,8 @@ class YjBoxBreakoutStrategy(Strategy):
             self._position_closed(context, event)
 
     def on_stop(self, context: StrategyContext, reason: str) -> None:
+        if reason == "completed" and self._last_trade_date is not None:
+            self._validate_box_session(context, self._last_trade_date)
         context.log.info(
             "yj_box_breakout_stopped",
             reason=reason,
@@ -165,12 +182,15 @@ class YjBoxBreakoutStrategy(Strategy):
         expected_minutes = tuple(
             range(config.box_start_minute, config.box_end_minute, 15)
         )
-        if any(minute not in day_bars for minute in expected_minutes):
-            context.log.warning(
-                "yj_box_incomplete",
-                trade_date=trade_date.isoformat(),
-                observed_bars=len(day_bars),
-                expected_bars=config.expected_box_bars,
+        missing_minutes = tuple(
+            minute for minute in expected_minutes if minute not in day_bars
+        )
+        if missing_minutes:
+            self._handle_incomplete_box(
+                context,
+                trade_date,
+                len(day_bars),
+                missing_minutes,
             )
             return
         ordered = tuple(day_bars[minute] for minute in expected_minutes)
@@ -196,6 +216,56 @@ class YjBoxBreakoutStrategy(Strategy):
         if config.draw_box:
             self._draw_box(context, box)
         self._submit_breakout_pair(context, box)
+
+    def _validate_box_session(
+        self,
+        context: StrategyContext,
+        trade_date: date,
+    ) -> None:
+        day_bars = self._bars_by_date.get(trade_date, {})
+        if not day_bars or trade_date in self._boxes:
+            return
+        expected_minutes = tuple(
+            range(
+                self.config.box_start_minute,
+                self.config.box_end_minute,
+                15,
+            )
+        )
+        missing_minutes = tuple(
+            minute for minute in expected_minutes if minute not in day_bars
+        )
+        if missing_minutes:
+            self._handle_incomplete_box(
+                context,
+                trade_date,
+                len(day_bars),
+                missing_minutes,
+            )
+
+    def _handle_incomplete_box(
+        self,
+        context: StrategyContext,
+        trade_date: date,
+        observed_bars: int,
+        missing_minutes: tuple[int, ...],
+    ) -> None:
+        missing_labels = tuple(
+            f"{minute // 60:02d}:{minute % 60:02d}" for minute in missing_minutes
+        )
+        if self.config.strict_box_validation:
+            raise RuntimeError(
+                "incomplete Tehran 01:30-03:30 box for "
+                f"{trade_date.isoformat()}: observed={observed_bars}, "
+                f"missing={','.join(missing_labels)}"
+            )
+        context.log.warning(
+            "yj_box_incomplete",
+            trade_date=trade_date.isoformat(),
+            observed_bars=observed_bars,
+            expected_bars=self.config.expected_box_bars,
+            missing_minutes=missing_labels,
+        )
 
     def _submit_breakout_pair(self, context: StrategyContext, box: BoxState) -> None:
         config = self.config
@@ -287,7 +357,7 @@ class YjBoxBreakoutStrategy(Strategy):
             leg_number = 2
             self._awaiting_reversal = None
         else:
-            event_date = self._datetime(position.opened_time_ns).date()
+            event_date = self._session_datetime(position.opened_time_ns).date()
             candidate = self._latest_box_on_or_before(event_date)
             if candidate is None:
                 return
@@ -435,7 +505,7 @@ class YjBoxBreakoutStrategy(Strategy):
             fill_opacity=Decimal("0.12"),
             border_width=2,
             label=(
-                f"01:30–03:30 BOX | High {box.high_ticks} | Low {box.low_ticks}"
+                f"TEHRAN 01:30–03:30 BOX | High {box.high_ticks} | Low {box.low_ticks}"
             ),
             z_index=5,
         )
@@ -517,15 +587,20 @@ class YjBoxBreakoutStrategy(Strategy):
             return "LIQUIDATED"
         return reason.replace("_", " ").upper()
 
-    @staticmethod
-    def _datetime(value_ns: int) -> datetime:
-        return datetime.fromtimestamp(value_ns / NANOSECONDS_PER_SECOND, tz=UTC)
+    def _session_datetime(self, value_ns: int) -> datetime:
+        utc_value = datetime.fromtimestamp(
+            value_ns / NANOSECONDS_PER_SECOND,
+            tz=UTC,
+        )
+        return utc_value.astimezone(self._session_zone)
 
-    @staticmethod
-    def _next_midnight_ns(value: date) -> int:
-        next_day = datetime.combine(value + timedelta(days=1), time.min, tzinfo=UTC)
-        return int(next_day.timestamp() * NANOSECONDS_PER_SECOND)
+    def _next_midnight_ns(self, value: date) -> int:
+        next_day = datetime.combine(
+            value + timedelta(days=1),
+            time.min,
+            tzinfo=self._session_zone,
+        )
+        return int(next_day.astimezone(UTC).timestamp() * NANOSECONDS_PER_SECOND)
 
-    @staticmethod
-    def _format_time(value_ns: int) -> str:
-        return YjBoxBreakoutStrategy._datetime(value_ns).strftime("%Y-%m-%d %H:%M")
+    def _format_time(self, value_ns: int) -> str:
+        return self._session_datetime(value_ns).strftime("%Y-%m-%d %H:%M %Z")

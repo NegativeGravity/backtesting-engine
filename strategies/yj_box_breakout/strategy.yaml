@@ -1,9 +1,9 @@
 schema_version: 1.0.0
 strategy_id: yj_box_breakout
-name: YJ 01:30-03:30 Box Breakout
-version: 1.0.0
+name: YJ Tehran 01:30-03:30 Box Breakout
+version: 1.1.0
 entrypoint: yj_box_breakout.strategy:YjBoxBreakoutStrategy
-description: XAUUSD M15 01:30-03:30 box breakout with 1 percent balance risk, 1.5R target, conservative intrabar resolution, and one automatic stop-and-reverse leg.
+description: XAUUSD M15 Tehran 01:30-03:30 two-sided box breakout with 1 percent balance risk, 1.5R target, conservative intrabar resolution, and one automatic stop-and-reverse leg.
 subscriptions:
   - symbol: XAUUSD
     timeframe: M15
@@ -21,9 +21,11 @@ default_parameters:
   box_end_minute: 210
   expected_box_bars: 8
   reward_risk_ratio: "1.5"
+  session_timezone: Asia/Tehran
   allow_long: true
   allow_short: true
   draw_box: true
+  strict_box_validation: true
 tags:
   - xauusd
   - m15

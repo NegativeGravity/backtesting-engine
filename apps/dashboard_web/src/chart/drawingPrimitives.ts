@@ -4,6 +4,16 @@ import type { DrawingState } from "./chartState";
 
 const DEFAULT_MAX_DRAWINGS = 1_500;
 const VIEWPORT_MARGIN = 120;
+const TEHRAN_TRADE_TIME_FORMATTER = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Tehran",
+  timeZoneName: "short"
+});
 
 export function buildDrawingPrimitives(
   drawings: Iterable<DrawingState>,
@@ -464,13 +474,9 @@ function formatPriceTicks(value: number, tickSize: number): string {
 
 function formatTimeNs(value: number): string {
   if (!Number.isFinite(value)) return "—";
-  const date = new Date(value / 1_000_000);
-  const day = String(date.getUTCDate()).padStart(2, "0");
-  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const hour = String(date.getUTCHours()).padStart(2, "0");
-  const minute = String(date.getUTCMinutes()).padStart(2, "0");
-  const second = String(date.getUTCSeconds()).padStart(2, "0");
-  return `${day}/${month} ${hour}:${minute}:${second} UTC`;
+  return TEHRAN_TRADE_TIME_FORMATTER.format(
+    new Date(value / 1_000_000)
+  ).replace(",", "");
 }
 
 function nullableFiniteNumber(value: unknown): number | null {

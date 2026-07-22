@@ -4,6 +4,7 @@ import {
   CrosshairMode,
   createChart,
   LineSeries,
+  TickMarkType,
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
@@ -56,7 +57,10 @@ export class LightweightChartsAdapter implements ChartAdapter {
           enableResize: true
         }
       },
-      localization: { locale: "en-US" },
+      localization: {
+        locale: "en-GB",
+        timeFormatter: time => formatTehranChartTime(Number(time))
+      },
       grid: {
         vertLines: { color: "rgba(38, 47, 61, 0.42)" },
         horzLines: { color: "rgba(38, 47, 61, 0.42)" }
@@ -98,7 +102,9 @@ export class LightweightChartsAdapter implements ChartAdapter {
         enableConflation: true,
         conflationThresholdFactor: 1,
         precomputeConflationOnInit: false,
-        precomputeConflationPriority: "background"
+        precomputeConflationPriority: "background",
+        tickMarkFormatter: (time, tickMarkType) =>
+          formatTehranChartTick(Number(time), tickMarkType)
       },
       handleScroll: {
         mouseWheel: true,
@@ -366,4 +372,59 @@ function normalizeLineWidth(value: number): 1 | 2 | 3 | 4 {
   if (value === 2) return 2;
   if (value === 3) return 3;
   return 4;
+}
+
+const TEHRAN_CHART_DATE_TIME = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Tehran",
+  timeZoneName: "short"
+});
+
+const TEHRAN_CHART_YEAR = new Intl.DateTimeFormat("en-GB", {
+  year: "numeric",
+  timeZone: "Asia/Tehran"
+});
+
+const TEHRAN_CHART_MONTH = new Intl.DateTimeFormat("en-GB", {
+  month: "short",
+  timeZone: "Asia/Tehran"
+});
+
+const TEHRAN_CHART_DAY = new Intl.DateTimeFormat("en-GB", {
+  month: "2-digit",
+  day: "2-digit",
+  timeZone: "Asia/Tehran"
+});
+
+const TEHRAN_CHART_TIME = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  timeZone: "Asia/Tehran"
+});
+
+function formatTehranChartTime(seconds: number): string {
+  if (!Number.isFinite(seconds)) return "—";
+  return TEHRAN_CHART_DATE_TIME.format(new Date(seconds * 1_000)).replace(
+    ",",
+    ""
+  );
+}
+
+function formatTehranChartTick(
+  seconds: number,
+  tickMarkType: TickMarkType
+): string | null {
+  if (!Number.isFinite(seconds)) return null;
+  const date = new Date(seconds * 1_000);
+  if (tickMarkType === TickMarkType.Year) return TEHRAN_CHART_YEAR.format(date);
+  if (tickMarkType === TickMarkType.Month) return TEHRAN_CHART_MONTH.format(date);
+  if (tickMarkType === TickMarkType.DayOfMonth) return TEHRAN_CHART_DAY.format(date);
+  return TEHRAN_CHART_TIME.format(date);
 }

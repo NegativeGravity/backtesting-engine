@@ -161,7 +161,7 @@ def test_gap_entry_recalculates_volume_and_target_from_actual_fill(
     assert position.average_entry_price_ticks == Decimal("1120")
     assert position.stop_loss_ticks == 900
     assert position.take_profit_ticks == 1450
-    assert position.volume_lots == Decimal("4.54545454")
+    assert position.volume_lots == Decimal("45.454545454545")
     sibling = next(
         order for order in instance.orders if order.request.client_order_id == "yj-short"
     )
@@ -172,7 +172,7 @@ def test_gap_entry_recalculates_volume_and_target_from_actual_fill(
     assert filled.status is OrderStatus.FILLED
     assert filled.revision >= 1
     assert filled.request.take_profit_ticks == 1450
-    assert filled.request.volume_lots == Decimal("4.54545454")
+    assert filled.request.volume_lots == Decimal("45.454545454545")
 
 
 def test_initial_stop_opens_one_reversal_and_reversal_cannot_exit_same_bar(
@@ -194,7 +194,7 @@ def test_initial_stop_opens_one_reversal_and_reversal_cannot_exit_same_bar(
     assert reversal.average_entry_price_ticks == Decimal("880")
     assert reversal.stop_loss_ticks == 1100
     assert reversal.take_profit_ticks == 550
-    assert reversal.volume_lots == Decimal("4.49586776")
+    assert reversal.volume_lots == Decimal("44.958677685950")
 
     target_result = instance.process_bar(make_bar(3, 880, 900, 500, 600))
 
@@ -303,3 +303,93 @@ def test_deferred_daily_entry_is_reevaluated_on_the_bar_that_becomes_flat(
     assert result.positions[0].side is PositionSide.LONG
     assert result.positions[0].average_entry_price_ticks == Decimal("1100")
     assert result.positions[0].opened_time_ns == 3 * BAR_SECONDS * NS
+
+
+
+def test_lower_gap_breakout_opens_short_and_cancels_long_sibling(
+    project_root: Path,
+) -> None:
+    instance, run = broker(project_root)
+    submit_pair(instance, run)
+
+    result = instance.process_bar(make_bar(1, 880, 1000, 860, 900))
+
+    assert len(result.positions) == 1
+    position = result.positions[0]
+    assert position.side is PositionSide.SHORT
+    assert position.average_entry_price_ticks == Decimal("880")
+    assert position.stop_loss_ticks == 1100
+    assert position.take_profit_ticks == 550
+    assert position.volume_lots == Decimal("45.454545454545")
+    long_sibling = next(
+        order for order in instance.orders if order.request.client_order_id == "yj-long"
+    )
+    short_entry = next(
+        order for order in instance.orders if order.request.client_order_id == "yj-short"
+    )
+    assert long_sibling.status is OrderStatus.CANCELLED
+    assert short_entry.status is OrderStatus.FILLED
+
+
+def test_short_initial_stop_opens_exactly_one_long_reversal(
+    project_root: Path,
+) -> None:
+    instance, run = broker(project_root)
+    submit_pair(instance, run)
+    instance.process_bar(make_bar(1, 880, 1000, 860, 900))
+
+    stop_result = instance.process_bar(make_bar(2, 1120, 1150, 500, 1000))
+
+    assert len(stop_result.trades) == 1
+    assert stop_result.trades[0].side is PositionSide.SHORT
+    assert stop_result.trades[0].exit_reason == "stop_loss"
+    assert stop_result.trades[0].exit_price_ticks == Decimal("1120")
+    assert len(stop_result.positions) == 1
+    reversal = stop_result.positions[0]
+    assert reversal.side is PositionSide.LONG
+    assert reversal.average_entry_price_ticks == Decimal("1120")
+    assert reversal.stop_loss_ticks == 900
+    assert reversal.take_profit_ticks == 1450
+
+    generated = [
+        order
+        for order in instance.orders
+        if order.request.tags.get("broker_generated") == "stop_and_reverse"
+    ]
+    assert len(generated) == 1
+
+    target_result = instance.process_bar(make_bar(3, 1120, 1460, 1000, 1400))
+    assert target_result.positions == ()
+    assert len(instance.trades) == 2
+    assert instance.trades[1].side is PositionSide.LONG
+    assert instance.trades[1].exit_reason == "take_profit"
+    assert instance.trades[1].exit_price_ticks == Decimal("1450")
+
+
+def test_conservative_stop_priority_and_no_third_leg(project_root: Path) -> None:
+    instance, run = broker(project_root)
+    submit_pair(instance, run)
+    instance.process_bar(make_bar(1, 1120, 1140, 1000, 1100))
+
+    both_touched = instance.process_bar(make_bar(2, 1120, 1500, 800, 1200))
+
+    assert len(both_touched.trades) == 1
+    assert both_touched.trades[0].side is PositionSide.LONG
+    assert both_touched.trades[0].exit_reason == "stop_loss"
+    assert both_touched.trades[0].exit_price_ticks == Decimal("900")
+    assert len(both_touched.positions) == 1
+    assert both_touched.positions[0].side is PositionSide.SHORT
+    assert both_touched.positions[0].average_entry_price_ticks == Decimal("900")
+
+    reversal_stop = instance.process_bar(make_bar(3, 1200, 1250, 850, 1000))
+
+    assert reversal_stop.positions == ()
+    assert len(instance.trades) == 2
+    assert instance.trades[1].side is PositionSide.SHORT
+    assert instance.trades[1].exit_reason == "stop_loss"
+    generated = [
+        order
+        for order in instance.orders
+        if order.request.tags.get("broker_generated") == "stop_and_reverse"
+    ]
+    assert len(generated) == 1

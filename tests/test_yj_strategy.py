@@ -1,6 +1,9 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import pytest
 
 from strategies.yj_box_breakout.strategy import (
     ENTRY_REEVALUATE_AFTER_FLAT_TAG,
@@ -14,6 +17,7 @@ from strategies.yj_box_breakout.strategy import (
     YjBoxBreakoutStrategy,
 )
 from vex_broker.simulator import BrokerSimulator
+from vex_contracts.dataset import DatasetManifest
 from vex_contracts.enums import OrderType, Side, TimeInForce
 from vex_contracts.market import Bar
 from vex_contracts.run import BacktestRunConfig
@@ -25,6 +29,7 @@ from vex_contracts.timeframes import Timeframe
 from vex_strategy.context import StrategyContext
 
 NS = 1_000_000_000
+TEHRAN = ZoneInfo("Asia/Tehran")
 
 
 def ns(value: datetime) -> int:
@@ -68,6 +73,24 @@ def test_yj_parameters_preserve_notebook_defaults() -> None:
     assert parameters.box_end_minute == 210
     assert parameters.expected_box_bars == 8
     assert parameters.reward_risk_ratio == Decimal("1.5")
+    assert parameters.session_timezone == "Asia/Tehran"
+    assert parameters.allow_long is True
+    assert parameters.allow_short is True
+
+
+def test_yj_dataset_and_session_clocks_are_explicit(project_root: Path) -> None:
+    root = project_root / "strategies" / "yj_box_breakout"
+    dataset = DatasetManifest.model_validate(load_yaml(root / "dataset.yaml"))
+    run, descriptor, _, _ = load_context_models(project_root)
+
+    assert dataset.dataset_id == "xauusd_mt5_yj_tehran"
+    assert dataset.source_timezone == "UTC"
+    assert len(dataset.files) == 1
+    assert dataset.files[0].timeframe is Timeframe.M15
+    assert run.dataset.dataset_id == dataset.dataset_id
+    assert run.dataset.version == dataset.version
+    assert run.strategy.parameters["session_timezone"] == "Asia/Tehran"
+    assert descriptor.version == "1.1.0"
 
 
 def test_yj_run_uses_notebook_parity_execution_profile(project_root: Path) -> None:
@@ -78,9 +101,12 @@ def test_yj_run_uses_notebook_parity_execution_profile(project_root: Path) -> No
     assert run.risk.max_margin_usage_percent == Decimal("100")
     assert run.execution.spread.points == 0
     assert run.execution.commission.mode.value == "none"
-    assert profile.volume_min == Decimal("0.00000001")
-    assert profile.volume_step == Decimal("0.00000001")
-    assert profile.volume_max == Decimal("1000000")
+    assert profile.digits == 3
+    assert profile.trade_tick_size == Decimal("0.001")
+    assert profile.trade_tick_value == Decimal("0.10")
+    assert profile.volume_min == Decimal("0.000000000001")
+    assert profile.volume_step == Decimal("0.000000000001")
+    assert profile.volume_max == Decimal("1000000000000")
 
 
 def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
@@ -101,7 +127,7 @@ def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
     context.drain()
 
     output = None
-    start = datetime(2025, 1, 2, 1, 30, tzinfo=UTC)
+    start = datetime(2025, 1, 3, 1, 30, tzinfo=TEHRAN).astimezone(UTC)
     for sequence in range(8):
         bar = make_box_bar(sequence, start + timedelta(minutes=15 * sequence))
         context.update_cycle(
@@ -150,6 +176,94 @@ def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
     assert short_intent.tags[ENTRY_REEVALUATE_AFTER_FLAT_TAG] == "true"
     assert short_intent.tags[INTRABAR_ENTRY_TARGET_ALLOWED_TAG] == "true"
     assert long_intent.tags["vex.oco.group"] == short_intent.tags["vex.oco.group"]
-    assert long_intent.expiration_time_ns == ns(datetime(2025, 1, 3, tzinfo=UTC))
-    assert short_intent.expiration_time_ns == ns(datetime(2025, 1, 3, tzinfo=UTC))
+    tehran_midnight = datetime(2025, 1, 4, tzinfo=TEHRAN).astimezone(UTC)
+    assert long_intent.expiration_time_ns == ns(tehran_midnight)
+    assert short_intent.expiration_time_ns == ns(tehran_midnight)
     assert len(output.chart_commands) == 3
+
+
+
+def test_tehran_session_does_not_treat_utc_0130_as_tehran_0130(project_root: Path) -> None:
+    run, descriptor, runtime, profile = load_context_models(project_root)
+    broker = BrokerSimulator(run, {"XAUUSD": profile})
+    parameters = YjBoxBreakoutParameters.model_validate(run.strategy.parameters)
+    strategy = YjBoxBreakoutStrategy(parameters.model_dump(mode="json"))
+    context = StrategyContext(
+        run,
+        descriptor,
+        runtime,
+        parameters,
+        broker.state_snapshot,
+    )
+    context.update_cycle(ns(run.start_time), (), (), broker.state_snapshot, ())
+    context.begin_callback()
+    strategy.on_start(context)
+    context.drain()
+
+    output = None
+    wrong_utc_start = datetime(2025, 1, 2, 1, 30, tzinfo=UTC)
+    for sequence in range(8):
+        bar = make_box_bar(sequence, wrong_utc_start + timedelta(minutes=15 * sequence))
+        context.update_cycle(bar.close_time_ns, (bar,), (), broker.state_snapshot, ())
+        context.begin_callback()
+        strategy.on_bar(context, bar)
+        output = context.drain()
+
+    assert output is not None
+    assert not [action for action in output.actions if isinstance(action, SubmitOrderAction)]
+
+
+def test_session_helpers_use_tehran_calendar_boundaries() -> None:
+    strategy = YjBoxBreakoutStrategy(
+        YjBoxBreakoutParameters().model_dump(mode="json")
+    )
+    utc_value = datetime(2025, 1, 1, 22, 0, tzinfo=UTC)
+
+    local_value = strategy._session_datetime(ns(utc_value))
+
+    assert local_value.date().isoformat() == "2025-01-02"
+    assert (local_value.hour, local_value.minute) == (1, 30)
+    expected_midnight = datetime(2025, 1, 3, tzinfo=TEHRAN).astimezone(UTC)
+    assert strategy._next_midnight_ns(local_value.date()) == ns(expected_midnight)
+    assert strategy._format_time(ns(utc_value)).endswith("+0330")
+
+
+
+def test_notebook_parity_rejects_single_direction_configuration() -> None:
+    with pytest.raises(ValueError, match="both long and short"):
+        YjBoxBreakoutParameters(allow_short=False)
+
+
+def test_partial_tehran_box_fails_on_session_rollover(project_root: Path) -> None:
+    run, descriptor, runtime, profile = load_context_models(project_root)
+    broker = BrokerSimulator(run, {"XAUUSD": profile})
+    parameters = YjBoxBreakoutParameters.model_validate(run.strategy.parameters)
+    strategy = YjBoxBreakoutStrategy(parameters.model_dump(mode="json"))
+    context = StrategyContext(
+        run,
+        descriptor,
+        runtime,
+        parameters,
+        broker.state_snapshot,
+    )
+    context.update_cycle(ns(run.start_time), (), (), broker.state_snapshot, ())
+    context.begin_callback()
+    strategy.on_start(context)
+    context.drain()
+
+    first = datetime(2025, 1, 3, 1, 30, tzinfo=TEHRAN).astimezone(UTC)
+    for sequence in range(2):
+        bar = make_box_bar(sequence, first + timedelta(minutes=15 * sequence))
+        context.update_cycle(bar.close_time_ns, (bar,), (), broker.state_snapshot, ())
+        context.begin_callback()
+        strategy.on_bar(context, bar)
+        context.drain()
+
+    next_day = make_box_bar(
+        3,
+        datetime(2025, 1, 4, 0, 0, tzinfo=TEHRAN).astimezone(UTC),
+    )
+    context.update_cycle(next_day.close_time_ns, (next_day,), (), broker.state_snapshot, ())
+    context.begin_callback()
+    with pytest.raises(RuntimeError, match="incomplete Tehran 01:30-03:30 box"):
+        strategy.on_bar(context, next_day)
