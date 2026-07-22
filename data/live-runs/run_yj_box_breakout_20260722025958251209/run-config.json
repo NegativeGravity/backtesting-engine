@@ -1,0 +1,102 @@
+{
+  "account": {
+    "allow_negative_balance": true,
+    "currency": "USD",
+    "initial_balance": "100000",
+    "leverage": "1000000",
+    "margin_call_level_percent": "100",
+    "position_mode": "hedging",
+    "schema_version": "1.0.0",
+    "stop_out_level_percent": "50"
+  },
+  "dataset": {
+    "dataset_id": "xauusd_mt5_yj_tehran",
+    "version": "1"
+  },
+  "end_time": "2026-07-13T13:30:00Z",
+  "execution": {
+    "allow_same_bar_exit_after_open_fill": true,
+    "commission": {
+      "mode": "none"
+    },
+    "gap_policy": "marketable_open",
+    "intrabar_policy": "conservative",
+    "pending_order_activation_policy": "next_bar",
+    "schema_version": "1.0.0",
+    "signal_execution_policy": "next_bar_open",
+    "slippage": {
+      "limit_order_points": 0,
+      "market_order_points": 0,
+      "mode": "fixed",
+      "stop_order_points": 0
+    },
+    "spread": {
+      "mode": "fixed",
+      "points": 0
+    }
+  },
+  "execution_timeframe": "M15",
+  "metadata": {
+    "close_open_positions_at_end": "true",
+    "session_timezone": "Asia/Tehran",
+    "source_notebook_sha256": "cd2439ebdfa813c9c52d0b528f21a81c03d6ee31c856e8f67215b4087039fc23",
+    "strategy_source": "yj-strategy.ipynb",
+    "timestamp_basis": "Asia/Tehran",
+    "two_sided_breakout": "true"
+  },
+  "name": "XAUUSD YJ Box Breakout With One Reversal [run_yj_box_breakout_20260722025958251209]",
+  "random_seed": 42,
+  "replay": {
+    "enabled": true,
+    "persist_account_snapshots": true,
+    "persist_chart_commands": true,
+    "snapshot_interval_events": 5000
+  },
+  "risk": {
+    "allow_long": true,
+    "allow_pyramiding": false,
+    "allow_short": true,
+    "default_sizing": {
+      "mode": "risk_percent",
+      "risk_percent": "1"
+    },
+    "max_margin_usage_percent": "100",
+    "max_open_positions": 1,
+    "max_symbol_positions": 1,
+    "schema_version": "1.0.0"
+  },
+  "run_id": "run_yj_box_breakout_20260722025958251209",
+  "schema_version": "1.0.0",
+  "start_time": "2025-01-02T01:00:00Z",
+  "strategy": {
+    "instance_id": "run_yj_box_breakout_20260722025958251209.strategy",
+    "parameters": {
+      "allow_long": true,
+      "allow_short": true,
+      "box_end_minute": 210,
+      "box_start_minute": 90,
+      "draw_box": true,
+      "expected_box_bars": 8,
+      "reward_risk_ratio": "1.5",
+      "session_timezone": "Asia/Tehran",
+      "signal_timeframe": "M15",
+      "strict_box_validation": false,
+      "symbol": "XAUUSD"
+    },
+    "strategy_id": "yj_box_breakout",
+    "version": "1.1.0"
+  },
+  "subscriptions": [
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "XAUUSD",
+      "timeframe": "M15"
+    }
+  ],
+  "symbol_profiles": [
+    {
+      "profile_id": "yj_xauusd_fractional",
+      "version": "1.1.0"
+    }
+  ]
+}

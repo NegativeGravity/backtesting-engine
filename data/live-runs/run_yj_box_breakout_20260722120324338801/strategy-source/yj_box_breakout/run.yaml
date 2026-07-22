@@ -1,0 +1,82 @@
+schema_version: 1.0.0
+run_id: run_xauusd_yj_tehran_box_breakout_v2
+name: XAUUSD YJ Box Breakout With One Reversal
+strategy:
+  strategy_id: yj_box_breakout
+  version: 1.1.1
+  instance_id: yj_box_breakout_primary
+  parameters:
+    symbol: XAUUSD
+    signal_timeframe: M15
+    box_start_minute: 90
+    box_end_minute: 210
+    expected_box_bars: 8
+    reward_risk_ratio: "1.5"
+    session_timezone: Asia/Tehran
+    allow_long: true
+    allow_short: true
+    draw_box: true
+    strict_box_validation: false
+dataset:
+  dataset_id: xauusd_mt5_yj_tehran
+  version: "1"
+symbol_profiles:
+  - profile_id: yj_xauusd_fractional
+    version: 1.1.0
+start_time: 2025-01-02T01:00:00Z
+end_time: 2026-07-13T13:30:00Z
+execution_timeframe: M15
+subscriptions:
+  - symbol: XAUUSD
+    timeframe: M15
+    higher_timeframe_access: closed_only
+account:
+  schema_version: 1.0.0
+  currency: USD
+  initial_balance: "100000"
+  leverage: "1000000"
+  position_mode: hedging
+  margin_call_level_percent: "100"
+  stop_out_level_percent: "50"
+  allow_negative_balance: true
+execution:
+  schema_version: 1.0.0
+  signal_execution_policy: next_bar_open
+  pending_order_activation_policy: next_bar
+  intrabar_policy: conservative
+  gap_policy: marketable_open
+  spread:
+    mode: fixed
+    points: 0
+  commission:
+    mode: none
+  slippage:
+    mode: fixed
+    market_order_points: 0
+    stop_order_points: 0
+    limit_order_points: 0
+  allow_same_bar_exit_after_open_fill: true
+risk:
+  schema_version: 1.0.0
+  default_sizing:
+    mode: risk_percent
+    risk_percent: "1"
+  max_open_positions: 1
+  max_symbol_positions: 1
+  allow_pyramiding: false
+  allow_long: true
+  allow_short: true
+  max_margin_usage_percent: "100"
+replay:
+  enabled: true
+  snapshot_interval_events: 5000
+  persist_chart_commands: true
+  persist_account_snapshots: true
+random_seed: 42
+metadata:
+  strategy_source: yj-strategy.ipynb
+  source_notebook_sha256: cd2439ebdfa813c9c52d0b528f21a81c03d6ee31c856e8f67215b4087039fc23
+  timestamp_basis: Asia/Tehran
+  session_timezone: Asia/Tehran
+  two_sided_breakout: "true"
+  close_open_positions_at_end: "true"
