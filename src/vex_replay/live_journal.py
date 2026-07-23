@@ -24,12 +24,12 @@ from vex_contracts.symbol import SymbolProfile
 from vex_data_engine.catalog import ParquetBarStore
 from vex_replay.builder import (
     _KIND_PRIORITY,
+    ReplayBundleBuilder,
+    SqliteReplayObserver,
     _copy_strategy_source,
     _json,
     _metrics,
     _source_digest,
-    ReplayBundleBuilder,
-    SqliteReplayObserver,
 )
 from vex_strategy.session import StrategyStepResult, datetime_to_ns
 
@@ -109,7 +109,6 @@ class LiveReplayJournal:
                 self._log_sequence,
                 cast(dict[str, JsonValue], canonical_data(record)),
             )
-
 
     def timeline_between(
         self,
@@ -240,7 +239,9 @@ class LiveReplayJournal:
             import_report_path=self.import_report_path.relative_to(self.project_root).as_posix(),
             sqlite_path=self.database_path.relative_to(self.project_root).as_posix(),
             symbol_profile_paths=(
-                (self.bundle_root / "symbol-profiles.json").relative_to(self.project_root).as_posix(),
+                (self.bundle_root / "symbol-profiles.json")
+                .relative_to(self.project_root)
+                .as_posix(),
             ),
             strategy_report_path=(self.bundle_root / "strategy-report.json")
             .relative_to(self.project_root)

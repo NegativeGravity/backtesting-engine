@@ -17,9 +17,8 @@ class DeadlinePacer:
             raise ValueError("rate_per_second must be positive")
         current = time.monotonic() if now is None else now
         interval = 1.0 / rate_per_second
-        if (
-            self._deadline is None
-            or current - self._deadline > max(self.maximum_drift_seconds, interval * 4)
+        if self._deadline is None or current - self._deadline > max(
+            self.maximum_drift_seconds, interval * 4
         ):
             self._deadline = current
         self._deadline += interval

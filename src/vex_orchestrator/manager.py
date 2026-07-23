@@ -690,9 +690,7 @@ class LiveBacktestJob:
             self._last_publish_monotonic = time.monotonic() if now is None else now
             subscribers = tuple(self._subscribers)
             recent_bars = (
-                {key: tuple(value) for key, value in self._recent_bars.items()}
-                if bar_reset
-                else {}
+                {key: tuple(value) for key, value in self._recent_bars.items()} if bar_reset else {}
             )
             state = self._state_unlocked()
         for subscriber in subscribers:
@@ -708,13 +706,7 @@ class LiveBacktestJob:
                     if bar.symbol == subscriber.symbol and bar.timeframe is subscriber.timeframe
                 )
             selected_bars = tuple(self._replay_bar(bar) for bar in selected_source)
-            frame_type = (
-                "reset"
-                if bar_reset
-                else "completed"
-                if result.completed
-                else "advance"
-            )
+            frame_type = "reset" if bar_reset else "completed" if result.completed else "advance"
             frame = ReplayFrame(
                 frame_type=frame_type,
                 cursor_sequence=result.processed_execution_bars,
@@ -749,7 +741,6 @@ class LiveBacktestJob:
                 recent[-1] = bar
             elif not recent or recent[-1].sequence < bar.sequence:
                 recent.append(bar)
-
 
     def _publish_interval_unlocked(self) -> float:
         if self.visualization_mode == "turbo":
@@ -992,11 +983,7 @@ class LiveBacktestJob:
             losing_trades=statistics.losing_trades,
             long_trades=statistics.long_trades,
             short_trades=statistics.short_trades,
-            win_rate=(
-                Decimal(statistics.winning_trades * 100) / total
-                if total
-                else Decimal("0")
-            ),
+            win_rate=(Decimal(statistics.winning_trades * 100) / total if total else Decimal("0")),
             profit_factor=(
                 statistics.gross_profit / statistics.gross_loss
                 if statistics.gross_loss > 0

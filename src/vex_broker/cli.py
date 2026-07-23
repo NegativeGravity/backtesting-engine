@@ -67,11 +67,15 @@ def _smoke(args: argparse.Namespace) -> int:
     broker = BrokerSimulator(run, {symbol: profile})
     bars = tuple(_bar(row) for row in frame.iter_rows(named=True))
     broker.process_bar(bars[0])
-    entry_reference = PriceResolver(
-        profile,
-        PriceBasis.BID,
-        run.execution.spread,
-    ).resolve(bars[0]).ask.close_ticks
+    entry_reference = (
+        PriceResolver(
+            profile,
+            PriceBasis.BID,
+            run.execution.spread,
+        )
+        .resolve(bars[0])
+        .ask.close_ticks
+    )
     stop = entry_reference - 500
     target = entry_reference + 1000
     volume = broker.size_position(symbol, entry_reference, stop)

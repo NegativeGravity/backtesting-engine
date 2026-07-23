@@ -166,9 +166,7 @@ def test_gap_entry_recalculates_volume_and_target_from_actual_fill(
         order for order in instance.orders if order.request.client_order_id == "yj-short"
     )
     assert sibling.status is OrderStatus.CANCELLED
-    filled = next(
-        order for order in instance.orders if order.request.client_order_id == "yj-long"
-    )
+    filled = next(order for order in instance.orders if order.request.client_order_id == "yj-long")
     assert filled.status is OrderStatus.FILLED
     assert filled.revision >= 1
     assert filled.request.take_profit_ticks == 1450
@@ -303,7 +301,6 @@ def test_deferred_daily_entry_is_reevaluated_on_the_bar_that_becomes_flat(
     assert result.positions[0].side is PositionSide.LONG
     assert result.positions[0].average_entry_price_ticks == Decimal("1100")
     assert result.positions[0].opened_time_ns == 3 * BAR_SECONDS * NS
-
 
 
 def test_lower_gap_breakout_opens_short_and_cancels_long_sibling(

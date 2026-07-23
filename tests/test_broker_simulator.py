@@ -552,8 +552,6 @@ def test_historical_spread_falls_back_for_zero_and_applies_bounds(project_root: 
     broker = BrokerSimulator(historical_run, {"XAUUSD": profile})
     broker.submit_order(make_order(historical_run, "historical_fallback", Side.BUY, 60 * NS))
 
-    result = broker.process_bar(
-        make_bar(1, 260000, 260050, 259990, 260010, source_spread_points=0)
-    )
+    result = broker.process_bar(make_bar(1, 260000, 260050, 259990, 260010, source_spread_points=0))
 
     assert result.fills[0].price_ticks == 260030

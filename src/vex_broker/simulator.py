@@ -243,11 +243,7 @@ class BrokerSimulator:
         swap = self._realized_swap_total + open_swap
         net_pnl = self.state.account.equity - self.run_config.account.initial_balance
         gross_pnl = (
-            net_pnl
-            + self._commission_total
-            + self._spread_total
-            + self._slippage_total
-            - swap
+            net_pnl + self._commission_total + self._spread_total + self._slippage_total - swap
         )
         digest_payload: dict[str, object] = {
             "run_id": self.run_config.run_id,
@@ -759,10 +755,9 @@ class BrokerSimulator:
 
         for group_id in sorted(grouped):
             orders = sorted(grouped[group_id], key=lambda item: item.order_id)
-            if (
-                any(entry_requires_flat(order) for order in orders)
-                and self._has_open_symbol_position(bar.symbol)
-            ):
+            if any(
+                entry_requires_flat(order) for order in orders
+            ) and self._has_open_symbol_position(bar.symbol):
                 continue
             decisions = [
                 (order, decision)
@@ -994,9 +989,7 @@ class BrokerSimulator:
         if distance <= 0:
             raise OrderRejectedError("execution risk/reward requires non-zero stop distance")
         target_distance = int(
-            (Decimal(distance) * instruction.reward_risk).to_integral_value(
-                rounding=ROUND_HALF_UP
-            )
+            (Decimal(distance) * instruction.reward_risk).to_integral_value(rounding=ROUND_HALF_UP)
         )
         if target_distance <= 0:
             raise OrderRejectedError("execution risk/reward target distance is zero")
@@ -1560,17 +1553,13 @@ class BrokerSimulator:
         trades: list[Trade],
         events: list[EventEnvelope[dict[str, JsonValue]]],
     ) -> tuple[str, ...]:
-        reverse_side = (
-            Side.SELL if closed_position.side == PositionSide.LONG.value else Side.BUY
-        )
+        reverse_side = Side.SELL if closed_position.side == PositionSide.LONG.value else Side.BUY
         entry_ticks = exit_decision.price_ticks
         stop_distance = abs(entry_ticks - reverse_stop_ticks)
         if stop_distance <= 0:
             return ()
         target_distance = int(
-            (Decimal(stop_distance) * reward_risk).to_integral_value(
-                rounding=ROUND_HALF_UP
-            )
+            (Decimal(stop_distance) * reward_risk).to_integral_value(rounding=ROUND_HALF_UP)
         )
         if target_distance <= 0:
             return ()
@@ -1632,9 +1621,7 @@ class BrokerSimulator:
         events.append(self._emit(EventType.ORDER_ACTIVATED, time_ns, active))
         try:
             self._validate_position_protection(
-                PositionSide.LONG.value
-                if reverse_side is Side.BUY
-                else PositionSide.SHORT.value,
+                PositionSide.LONG.value if reverse_side is Side.BUY else PositionSide.SHORT.value,
                 entry_ticks,
                 reverse_stop_ticks,
                 target_ticks,

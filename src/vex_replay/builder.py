@@ -11,7 +11,6 @@ from pydantic import BaseModel, JsonValue
 
 from vex_analytics.engine import AnalyticsEngine
 from vex_broker.models import BrokerResult
-from vex_broker.simulator import BrokerSimulator
 from vex_contracts.analytics import AnalyticsConfig, EquityCurvePoint
 from vex_contracts.broker import BrokerStateSnapshot
 from vex_contracts.enums import EventType
@@ -61,9 +60,7 @@ class SqliteReplayObserver(StrategyRunObserver):
         )
         account = snapshot.account
         meaningful_events = tuple(
-            event
-            for event in result.events
-            if event.event_type is not EventType.ACCOUNT_UPDATED
+            event for event in result.events if event.event_type is not EventType.ACCOUNT_UPDATED
         )
         should_sample_equity = (
             self.bar_count == 1
@@ -110,9 +107,7 @@ class SqliteReplayObserver(StrategyRunObserver):
         force_snapshot: bool,
     ) -> None:
         meaningful_events = tuple(
-            event
-            for event in result.events
-            if event.event_type is not EventType.ACCOUNT_UPDATED
+            event for event in result.events if event.event_type is not EventType.ACCOUNT_UPDATED
         )
         for event in meaningful_events:
             payload = cast(dict[str, JsonValue], event.model_dump(mode="json"))

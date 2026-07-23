@@ -353,9 +353,7 @@ class StrategyBacktestSession:
                     self._last_time_ns,
                     forming_bars,
                 )
-                consumed = _ConsumedOutput(
-                    broker_events=close_result.events
-                ).merge(close_consumed)
+                consumed = _ConsumedOutput(broker_events=close_result.events).merge(close_consumed)
             stop_output = process.stop(
                 WorkerStopRequest(
                     event_time_ns=self._last_time_ns,

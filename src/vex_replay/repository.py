@@ -126,14 +126,20 @@ class ReplayRunRepository:
                 if row is None:
                     raise ValueError(f"replay metrics missing for {manifest.run_id}")
                 metrics = ReplayMetrics.model_validate(json.loads(str(row[0])))
-                has_state_snapshots = connection.execute(
-                    "SELECT 1 FROM sqlite_master "
-                    "WHERE type = 'table' AND name = 'broker_state_snapshots'"
-                ).fetchone() is not None
-                has_terminal_orders = connection.execute(
-                    "SELECT 1 FROM sqlite_master "
-                    "WHERE type = 'table' AND name = 'terminal_orders'"
-                ).fetchone() is not None
+                has_state_snapshots = (
+                    connection.execute(
+                        "SELECT 1 FROM sqlite_master "
+                        "WHERE type = 'table' AND name = 'broker_state_snapshots'"
+                    ).fetchone()
+                    is not None
+                )
+                has_terminal_orders = (
+                    connection.execute(
+                        "SELECT 1 FROM sqlite_master "
+                        "WHERE type = 'table' AND name = 'terminal_orders'"
+                    ).fetchone()
+                    is not None
+                )
             database_stat = database_path.stat()
             analytics_path = (
                 self.project_root / manifest.analytics_report_path

@@ -4,7 +4,6 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
-
 from strategies.yj_box_breakout.strategy import (
     ENTRY_REEVALUATE_AFTER_FLAT_TAG,
     ENTRY_REQUIRE_FLAT_TAG,
@@ -16,6 +15,7 @@ from strategies.yj_box_breakout.strategy import (
     YjBoxBreakoutParameters,
     YjBoxBreakoutStrategy,
 )
+
 from vex_broker.simulator import BrokerSimulator
 from vex_contracts.dataset import DatasetManifest
 from vex_contracts.enums import OrderType, Side, TimeInForce
@@ -182,7 +182,6 @@ def test_complete_box_emits_exact_oco_breakout_pair(project_root: Path) -> None:
     assert len(output.chart_commands) == 3
 
 
-
 def test_tehran_session_does_not_treat_utc_0130_as_tehran_0130(project_root: Path) -> None:
     run, descriptor, runtime, profile = load_context_models(project_root)
     broker = BrokerSimulator(run, {"XAUUSD": profile})
@@ -214,9 +213,7 @@ def test_tehran_session_does_not_treat_utc_0130_as_tehran_0130(project_root: Pat
 
 
 def test_session_helpers_use_tehran_calendar_boundaries() -> None:
-    strategy = YjBoxBreakoutStrategy(
-        YjBoxBreakoutParameters().model_dump(mode="json")
-    )
+    strategy = YjBoxBreakoutStrategy(YjBoxBreakoutParameters().model_dump(mode="json"))
     utc_value = datetime(2025, 1, 1, 22, 0, tzinfo=UTC)
 
     local_value = strategy._session_datetime(ns(utc_value))
@@ -226,7 +223,6 @@ def test_session_helpers_use_tehran_calendar_boundaries() -> None:
     expected_midnight = datetime(2025, 1, 3, tzinfo=TEHRAN).astimezone(UTC)
     assert strategy._next_midnight_ns(local_value.date()) == ns(expected_midnight)
     assert strategy._format_time(ns(utc_value)).endswith("+0330")
-
 
 
 def test_notebook_parity_rejects_single_direction_configuration() -> None:

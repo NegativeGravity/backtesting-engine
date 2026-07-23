@@ -10,8 +10,6 @@ from vex_contracts.positions import AccountSnapshot, Position, Trade
 ZERO = Decimal("0")
 
 
-
-
 @dataclass(frozen=True, slots=True)
 class BrokerAggregateStatistics:
     commission: Decimal = ZERO
@@ -29,6 +27,7 @@ class BrokerAggregateStatistics:
     short_trades: int = 0
     rejected_orders: int = 0
     cancelled_orders: int = 0
+
 
 @dataclass(slots=True)
 class PositionState:
