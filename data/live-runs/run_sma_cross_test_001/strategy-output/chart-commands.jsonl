@@ -1,3 +1,0 @@
-{"command_type":"declare_pane","pane":{"height_weight":"1","overlay":true,"pane_id":"sma.main","title":"SMA Cross"}}
-{"command_type":"declare_series","series":{"color":"#2962FF","kind":"line","layer_id":"run_sma_cross_test_001.strategy","line_width":2,"pane_id":"sma.main","price_scale_id":"right","series_id":"sma.fast","title":"SMA 10","visible":true}}
-{"command_type":"declare_series","series":{"color":"#FF9800","kind":"line","layer_id":"run_sma_cross_test_001.strategy","line_width":2,"pane_id":"sma.main","price_scale_id":"right","series_id":"sma.slow","title":"SMA 30","visible":true}}

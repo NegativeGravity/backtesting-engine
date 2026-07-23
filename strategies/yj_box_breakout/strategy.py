@@ -32,8 +32,10 @@ STOP_AND_REVERSE_ENABLED_TAG = "vex.stop_and_reverse.enabled"
 STOP_AND_REVERSE_STOP_TICKS_TAG = "vex.stop_and_reverse.stop_ticks"
 STOP_AND_REVERSE_REWARD_RISK_TAG = "vex.stop_and_reverse.reward_risk"
 STOP_AND_REVERSE_CHAIN_ID_TAG = "vex.stop_and_reverse.chain_id"
+STOP_AND_REVERSE_ACCOUNT_BASIS_TAG = "vex.stop_and_reverse.account_basis"
 EXECUTION_RISK_REWARD_ENABLED_TAG = "vex.execution_risk_reward.enabled"
 EXECUTION_REWARD_RISK_TAG = "vex.execution_risk_reward.ratio"
+EXECUTION_ACCOUNT_BASIS_TAG = "vex.execution_risk_reward.account_basis"
 ENTRY_REQUIRE_FLAT_TAG = "vex.entry.require_flat"
 ENTRY_REEVALUATE_AFTER_FLAT_TAG = "vex.entry.reevaluate_after_flat"
 INTRABAR_ENTRY_TARGET_ALLOWED_TAG = "vex.intrabar_entry.target_allowed"
@@ -78,6 +80,7 @@ class YjBoxBreakoutParameters(BaseModel):
     allow_short: bool = True
     draw_box: bool = True
     strict_box_validation: bool = True
+    allow_overlapping_daily_chains: bool = True
 
     @model_validator(mode="after")
     def validate_strategy(self) -> YjBoxBreakoutParameters:
@@ -108,7 +111,6 @@ class YjBoxBreakoutStrategy(Strategy):
         self._boxes: dict[date, BoxState] = {}
         self._chain_ids_by_date: dict[date, str] = {}
         self._position_visuals: dict[str, TradeVisualState] = {}
-        self._awaiting_reversal: tuple[date, str] | None = None
         self._chain_sequence = 0
         self._session_zone = ZoneInfo(self.config.session_timezone)
         self._last_trade_date: date | None = None
@@ -130,28 +132,31 @@ class YjBoxBreakoutStrategy(Strategy):
             session_timezone=self.config.session_timezone,
             two_sided_breakout=self.config.allow_long and self.config.allow_short,
             strict_box_validation=self.config.strict_box_validation,
+            allow_overlapping_daily_chains=self.config.allow_overlapping_daily_chains,
         )
 
     def on_bar(self, context: StrategyContext, bar: Bar) -> None:
         config = self.config
         if bar.symbol != config.symbol or bar.timeframe is not config.signal_timeframe:
             return
-        if self._awaiting_reversal is not None and not context.portfolio.positions(
-            config.symbol
-        ):
-            self._awaiting_reversal = None
+
         opened = self._session_datetime(bar.open_time_ns)
         trade_date = opened.date()
         minute = opened.hour * 60 + opened.minute
+
         if self._last_trade_date is not None and trade_date != self._last_trade_date:
             self._validate_box_session(context, self._last_trade_date)
+
         self._last_trade_date = trade_date
         self._prune_state(trade_date)
+
         if config.box_start_minute <= minute < config.box_end_minute:
             day_bars = self._bars_by_date.setdefault(trade_date, {})
             day_bars[minute] = bar
             if minute == config.box_end_minute - 15:
                 self._finalize_box(context, trade_date)
+            elif config.draw_box:
+                self._draw_forming_box(context, trade_date)
 
     def on_order_update(
         self,
@@ -160,15 +165,21 @@ class YjBoxBreakoutStrategy(Strategy):
     ) -> None:
         if event.event_type is EventType.ORDER_REJECTED:
             self._handle_reversal_rejection(context, event)
+
         if event.event_type is EventType.POSITION_OPENED:
             self._position_opened(context, event)
             return
-        if event.event_type in {EventType.POSITION_CLOSED, EventType.POSITION_LIQUIDATED}:
+
+        if event.event_type in {
+            EventType.POSITION_CLOSED,
+            EventType.POSITION_LIQUIDATED,
+        }:
             self._position_closed(context, event)
 
     def on_stop(self, context: StrategyContext, reason: str) -> None:
         if reason == "completed" and self._last_trade_date is not None:
             self._validate_box_session(context, self._last_trade_date)
+
         context.log.info(
             "yj_box_breakout_stopped",
             reason=reason,
@@ -185,6 +196,7 @@ class YjBoxBreakoutStrategy(Strategy):
         missing_minutes = tuple(
             minute for minute in expected_minutes if minute not in day_bars
         )
+
         if missing_minutes:
             self._handle_incomplete_box(
                 context,
@@ -193,9 +205,11 @@ class YjBoxBreakoutStrategy(Strategy):
                 missing_minutes,
             )
             return
+
         ordered = tuple(day_bars[minute] for minute in expected_minutes)
         high_ticks = max(bar.high_ticks for bar in ordered)
         low_ticks = min(bar.low_ticks for bar in ordered)
+
         if high_ticks <= low_ticks:
             context.log.warning(
                 "yj_box_invalid",
@@ -204,6 +218,7 @@ class YjBoxBreakoutStrategy(Strategy):
                 low_ticks=low_ticks,
             )
             return
+
         box = BoxState(
             trade_date=trade_date,
             start_time_ns=ordered[0].open_time_ns,
@@ -213,8 +228,10 @@ class YjBoxBreakoutStrategy(Strategy):
             bar_count=len(ordered),
         )
         self._boxes[trade_date] = box
+
         if config.draw_box:
             self._draw_box(context, box)
+
         self._submit_breakout_pair(context, box)
 
     def _validate_box_session(
@@ -225,6 +242,7 @@ class YjBoxBreakoutStrategy(Strategy):
         day_bars = self._bars_by_date.get(trade_date, {})
         if not day_bars or trade_date in self._boxes:
             return
+
         expected_minutes = tuple(
             range(
                 self.config.box_start_minute,
@@ -235,6 +253,7 @@ class YjBoxBreakoutStrategy(Strategy):
         missing_minutes = tuple(
             minute for minute in expected_minutes if minute not in day_bars
         )
+
         if missing_minutes:
             self._handle_incomplete_box(
                 context,
@@ -253,18 +272,25 @@ class YjBoxBreakoutStrategy(Strategy):
         missing_labels = tuple(
             f"{minute // 60:02d}:{minute % 60:02d}" for minute in missing_minutes
         )
+        missing_text = ",".join(missing_labels)
+
+        if self.config.draw_box:
+            self._delete_box_drawings(context, trade_date)
+
         if self.config.strict_box_validation:
             raise RuntimeError(
                 "incomplete Tehran 01:30-03:30 box for "
                 f"{trade_date.isoformat()}: observed={observed_bars}, "
-                f"missing={','.join(missing_labels)}"
+                f"missing={missing_text}"
             )
+
         context.log.warning(
             "yj_box_incomplete",
             trade_date=trade_date.isoformat(),
             observed_bars=observed_bars,
             expected_bars=self.config.expected_box_bars,
-            missing_minutes=missing_labels,
+            missing_minutes=missing_text,
+            missing_count=len(missing_labels),
         )
 
     def _submit_breakout_pair(self, context: StrategyContext, box: BoxState) -> None:
@@ -280,6 +306,7 @@ class YjBoxBreakoutStrategy(Strategy):
         )
         oco_group = f"yj-entry-{chain_id}"
         self._chain_ids_by_date[box.trade_date] = chain_id
+
         common_tags = {
             "strategy": "yj_box_breakout",
             "chain_id": chain_id,
@@ -290,18 +317,18 @@ class YjBoxBreakoutStrategy(Strategy):
             STOP_AND_REVERSE_ENABLED_TAG: "true",
             STOP_AND_REVERSE_REWARD_RISK_TAG: str(config.reward_risk_ratio),
             STOP_AND_REVERSE_CHAIN_ID_TAG: chain_id,
+            STOP_AND_REVERSE_ACCOUNT_BASIS_TAG: "balance",
             EXECUTION_RISK_REWARD_ENABLED_TAG: "true",
             EXECUTION_REWARD_RISK_TAG: str(config.reward_risk_ratio),
-            ENTRY_REQUIRE_FLAT_TAG: "true",
-            ENTRY_REEVALUATE_AFTER_FLAT_TAG: "true",
+            EXECUTION_ACCOUNT_BASIS_TAG: "balance",
             INTRABAR_ENTRY_TARGET_ALLOWED_TAG: "true",
         }
+
+        if not config.allow_overlapping_daily_chains:
+            common_tags[ENTRY_REQUIRE_FLAT_TAG] = "true"
+            common_tags[ENTRY_REEVALUATE_AFTER_FLAT_TAG] = "true"
+
         if config.allow_long:
-            long_client_id = f"yj-long-{chain_id}"
-            long_tags = common_tags | {
-                "direction": "long",
-                STOP_AND_REVERSE_STOP_TICKS_TAG: str(box.high_ticks),
-            }
             context.orders.stop(
                 config.symbol,
                 Side.BUY,
@@ -311,15 +338,15 @@ class YjBoxBreakoutStrategy(Strategy):
                 take_profit_ticks=box.high_ticks + target_distance,
                 time_in_force=TimeInForce.DAY,
                 expiration_time_ns=expiration_time_ns,
-                client_order_id=long_client_id,
-                tags=long_tags,
+                client_order_id=f"yj-long-{chain_id}",
+                tags=common_tags
+                | {
+                    "direction": "long",
+                    STOP_AND_REVERSE_STOP_TICKS_TAG: str(box.high_ticks),
+                },
             )
+
         if config.allow_short:
-            short_client_id = f"yj-short-{chain_id}"
-            short_tags = common_tags | {
-                "direction": "short",
-                STOP_AND_REVERSE_STOP_TICKS_TAG: str(box.low_ticks),
-            }
             context.orders.stop(
                 config.symbol,
                 Side.SELL,
@@ -329,9 +356,14 @@ class YjBoxBreakoutStrategy(Strategy):
                 take_profit_ticks=box.low_ticks - target_distance,
                 time_in_force=TimeInForce.DAY,
                 expiration_time_ns=expiration_time_ns,
-                client_order_id=short_client_id,
-                tags=short_tags,
+                client_order_id=f"yj-short-{chain_id}",
+                tags=common_tags
+                | {
+                    "direction": "short",
+                    STOP_AND_REVERSE_STOP_TICKS_TAG: str(box.low_ticks),
+                },
             )
+
         box.submitted = True
         context.log.info(
             "yj_breakout_orders_submitted",
@@ -352,21 +384,8 @@ class YjBoxBreakoutStrategy(Strategy):
             return
         if position.stop_loss_ticks is None or position.take_profit_ticks is None:
             return
-        if self._awaiting_reversal is not None:
-            trade_date, chain_id = self._awaiting_reversal
-            leg_number = 2
-            self._awaiting_reversal = None
-        else:
-            event_date = self._session_datetime(position.opened_time_ns).date()
-            candidate = self._latest_box_on_or_before(event_date)
-            if candidate is None:
-                return
-            trade_date = candidate.trade_date
-            chain_id = self._chain_ids_by_date.get(
-                trade_date,
-                f"{trade_date.isoformat()}-unknown",
-            )
-            leg_number = 1
+
+        trade_date, chain_id, leg_number = self._position_identity(position)
         visual = TradeVisualState(
             trade_date=trade_date,
             chain_id=chain_id,
@@ -378,6 +397,8 @@ class YjBoxBreakoutStrategy(Strategy):
             target_price_ticks=position.take_profit_ticks,
         )
         self._position_visuals[position.position_id] = visual
+        self._redraw_audit_box(context, trade_date)
+
         context.chart.risk_reward(
             f"yj.trade.{position.position_id}",
             position.position_id,
@@ -389,7 +410,8 @@ class YjBoxBreakoutStrategy(Strategy):
             position.stop_loss_ticks,
             position.take_profit_ticks,
             label=(
-                f"YJ LEG {leg_number} {position.side.value.upper()} | "
+                f"YJ {trade_date.isoformat()} | CHAIN {chain_id} | "
+                f"LEG {leg_number} {position.side.value.upper()} | "
                 f"OPEN {self._format_time(position.opened_time_ns)}"
             ),
             z_index=20,
@@ -399,26 +421,38 @@ class YjBoxBreakoutStrategy(Strategy):
             position.symbol,
             self.config.signal_timeframe,
             position.opened_time_ns,
-            ChartMarkerShape.ARROW_UP
-            if position.side is PositionSide.LONG
-            else ChartMarkerShape.ARROW_DOWN,
-            ChartMarkerPosition.BELOW_BAR
-            if position.side is PositionSide.LONG
-            else ChartMarkerPosition.ABOVE_BAR,
+            (
+                ChartMarkerShape.ARROW_UP
+                if position.side is PositionSide.LONG
+                else ChartMarkerShape.ARROW_DOWN
+            ),
+            (
+                ChartMarkerPosition.BELOW_BAR
+                if position.side is PositionSide.LONG
+                else ChartMarkerPosition.ABOVE_BAR
+            ),
             "#089981" if position.side is PositionSide.LONG else "#F23645",
             price_ticks=position.average_entry_price_ticks,
-            text=f"LEG {leg_number} {position.side.value.upper()}",
+            text=(
+                f"{trade_date.isoformat()} L{leg_number} "
+                f"{position.side.value.upper()}"
+            ),
             z_index=30,
         )
         context.log.info(
             "yj_position_opened",
             position_id=position.position_id,
+            entry_order_id=position.entry_order_id or "",
             chain_id=chain_id,
+            trade_date=trade_date.isoformat(),
             leg_number=leg_number,
             side=position.side.value,
             entry_ticks=float(position.average_entry_price_ticks),
             stop_ticks=position.stop_loss_ticks,
             target_ticks=position.take_profit_ticks,
+            concurrent_positions=len(
+                context.portfolio.positions(self.config.symbol)
+            ),
         )
 
     def _position_closed(
@@ -429,18 +463,23 @@ class YjBoxBreakoutStrategy(Strategy):
         trade_payload = event.payload.get("trade")
         if not isinstance(trade_payload, dict):
             return
+
         trade = Trade.model_validate(trade_payload)
         if trade.symbol != self.config.symbol:
             return
+
         visual = self._position_visuals.pop(trade.position_id, None)
         if visual is None:
             return
+
+        self._redraw_audit_box(context, visual.trade_date)
         hit_label = self._exit_label(trade.exit_reason)
         r_text = (
             ""
             if trade.realized_r_multiple is None
             else f" | {trade.realized_r_multiple:.2f}R"
         )
+
         context.chart.risk_reward(
             f"yj.trade.{trade.position_id}",
             trade.trade_id,
@@ -454,8 +493,9 @@ class YjBoxBreakoutStrategy(Strategy):
             exit_time_ns=trade.exit_time_ns,
             exit_price_ticks=trade.exit_price_ticks,
             label=(
-                f"{hit_label} | LEG {visual.leg_number} | Net PnL {trade.net_pnl:.2f}"
-                f"{r_text} | OPEN {self._format_time(visual.entry_time_ns)} | "
+                f"{hit_label} | LEG {visual.leg_number} | "
+                f"Net PnL {trade.net_pnl:.2f}{r_text} | "
+                f"OPEN {self._format_time(visual.entry_time_ns)} | "
                 f"CLOSE {self._format_time(trade.exit_time_ns)}"
             ),
             z_index=20,
@@ -472,14 +512,11 @@ class YjBoxBreakoutStrategy(Strategy):
             text=f"{hit_label} {trade.net_pnl:.2f}",
             z_index=31,
         )
-        if visual.leg_number == 1 and trade.exit_reason == "stop_loss":
-            self._awaiting_reversal = (visual.trade_date, visual.chain_id)
-        else:
-            self._awaiting_reversal = None
         context.log.info(
             "yj_position_closed",
             trade_id=trade.trade_id,
             chain_id=visual.chain_id,
+            trade_date=visual.trade_date.isoformat(),
             leg_number=visual.leg_number,
             exit_reason=trade.exit_reason,
             net_pnl=float(trade.net_pnl),
@@ -490,7 +527,51 @@ class YjBoxBreakoutStrategy(Strategy):
             ),
         )
 
-    def _draw_box(self, context: StrategyContext, box: BoxState) -> None:
+    def _draw_forming_box(
+        self,
+        context: StrategyContext,
+        trade_date: date,
+    ) -> None:
+        day_bars = self._bars_by_date.get(trade_date, {})
+        if not day_bars:
+            return
+
+        ordered = tuple(day_bars[minute] for minute in sorted(day_bars))
+        high_ticks = max(bar.high_ticks for bar in ordered)
+        low_ticks = min(bar.low_ticks for bar in ordered)
+        if high_ticks <= low_ticks:
+            return
+
+        self._draw_box(
+            context,
+            BoxState(
+                trade_date=trade_date,
+                start_time_ns=ordered[0].open_time_ns,
+                end_time_ns=ordered[-1].close_time_ns,
+                high_ticks=high_ticks,
+                low_ticks=low_ticks,
+                bar_count=len(ordered),
+            ),
+            forming=True,
+        )
+
+    def _delete_box_drawings(
+        self,
+        context: StrategyContext,
+        trade_date: date,
+    ) -> None:
+        drawing_key = trade_date.isoformat()
+        context.chart.delete(f"yj.box.{drawing_key}")
+        context.chart.delete(f"yj.box.high.{drawing_key}")
+        context.chart.delete(f"yj.box.low.{drawing_key}")
+
+    def _draw_box(
+        self,
+        context: StrategyContext,
+        box: BoxState,
+        *,
+        forming: bool = False,
+    ) -> None:
         drawing_key = box.trade_date.isoformat()
         context.chart.rectangle(
             f"yj.box.{drawing_key}",
@@ -502,13 +583,20 @@ class YjBoxBreakoutStrategy(Strategy):
             box.high_ticks,
             border_color="#2962FF",
             fill_color="#2962FF",
-            fill_opacity=Decimal("0.12"),
-            border_width=2,
+            fill_opacity=Decimal("0.08") if forming else Decimal("0.16"),
+            border_width=1 if forming else 2,
+            border_style=(
+                ChartLineStyle.DASHED if forming else ChartLineStyle.SOLID
+            ),
             label=(
-                f"TEHRAN 01:30–03:30 BOX | High {box.high_ticks} | Low {box.low_ticks}"
+                f"YJ TEHRAN 01:30–03:30 "
+                f"{'FORMING' if forming else 'BOX'} | "
+                f"{box.bar_count}/8 | High {box.high_ticks} | "
+                f"Low {box.low_ticks}"
             ),
             z_index=5,
         )
+
         day_end_ns = self._next_midnight_ns(box.trade_date)
         context.chart.trend_line(
             f"yj.box.high.{drawing_key}",
@@ -520,7 +608,11 @@ class YjBoxBreakoutStrategy(Strategy):
             box.high_ticks,
             color="#2962FF",
             width=1,
-            style=ChartLineStyle.DASHED,
+            style=(
+                ChartLineStyle.DOTTED
+                if forming
+                else ChartLineStyle.DASHED
+            ),
             z_index=4,
         )
         context.chart.trend_line(
@@ -533,7 +625,11 @@ class YjBoxBreakoutStrategy(Strategy):
             box.low_ticks,
             color="#2962FF",
             width=1,
-            style=ChartLineStyle.DASHED,
+            style=(
+                ChartLineStyle.DOTTED
+                if forming
+                else ChartLineStyle.DASHED
+            ),
             z_index=4,
         )
 
@@ -549,37 +645,87 @@ class YjBoxBreakoutStrategy(Strategy):
         }
         if not payload:
             return
+
         order = Order.model_validate(payload)
         if order.request.tags.get("broker_generated") != "stop_and_reverse":
             return
-        self._awaiting_reversal = None
+
         context.log.warning(
             "yj_reversal_rejected",
             order_id=order.order_id,
+            chain_id=order.request.tags.get("chain_id", ""),
+            trade_date=order.request.tags.get("trade_date", ""),
             reason=order.rejection_reason,
         )
 
+    def _position_identity(self, position: Position) -> tuple[date, str, int]:
+        tags = getattr(position, "entry_tags", {}) or {}
+        raw_date = tags.get("trade_date")
+        raw_chain = tags.get("chain_id") or tags.get(
+            STOP_AND_REVERSE_CHAIN_ID_TAG
+        )
+        raw_leg = tags.get("leg", "1")
+
+        try:
+            trade_date = date.fromisoformat(raw_date) if raw_date else None
+        except ValueError:
+            trade_date = None
+
+        try:
+            leg_number = int(raw_leg)
+        except ValueError:
+            leg_number = 1
+
+        if trade_date is None:
+            event_date = self._session_datetime(position.opened_time_ns).date()
+            candidate = self._latest_box_on_or_before(event_date)
+            trade_date = (
+                candidate.trade_date
+                if candidate is not None
+                else event_date
+            )
+
+        chain_id = raw_chain or self._chain_ids_by_date.get(
+            trade_date,
+            f"{trade_date.isoformat()}-unknown",
+        )
+        return trade_date, chain_id, 2 if leg_number == 2 else 1
+
     def _latest_box_on_or_before(self, value: date) -> BoxState | None:
-        candidates = [box for day, box in self._boxes.items() if day <= value]
-        return max(candidates, key=lambda box: box.trade_date) if candidates else None
+        candidates = [
+            box for day, box in self._boxes.items() if day <= value
+        ]
+        return (
+            max(candidates, key=lambda box: box.trade_date)
+            if candidates
+            else None
+        )
+
+    def _redraw_audit_box(
+        self,
+        context: StrategyContext,
+        trade_date: date,
+    ) -> None:
+        if not self.config.draw_box:
+            return
+
+        box = self._boxes.get(trade_date)
+        if box is not None:
+            self._draw_box(context, box)
 
     def _prune_state(self, current_date: date) -> None:
         cutoff = current_date - timedelta(days=7)
         self._bars_by_date = {
-            day: bars for day, bars in self._bars_by_date.items() if day >= cutoff
-        }
-        self._boxes = {day: box for day, box in self._boxes.items() if day >= cutoff}
-        self._chain_ids_by_date = {
-            day: chain_id
-            for day, chain_id in self._chain_ids_by_date.items()
+            day: bars
+            for day, bars in self._bars_by_date.items()
             if day >= cutoff
         }
 
     @staticmethod
     def _exit_label(reason: str) -> str:
-        if reason == "take_profit":
+        if reason.startswith("take_profit"):
             return "TP HIT"
-        if reason == "stop_loss":
+        if reason.startswith("stop_loss"):
             return "SL HIT"
         if reason == "end_of_data":
             return "END OF DATA"
@@ -600,7 +746,11 @@ class YjBoxBreakoutStrategy(Strategy):
             time.min,
             tzinfo=self._session_zone,
         )
-        return int(next_day.astimezone(UTC).timestamp() * NANOSECONDS_PER_SECOND)
+        return int(
+            next_day.astimezone(UTC).timestamp() * NANOSECONDS_PER_SECOND
+        )
 
     def _format_time(self, value_ns: int) -> str:
-        return self._session_datetime(value_ns).strftime("%Y-%m-%d %H:%M %Z")
+        return self._session_datetime(value_ns).strftime(
+            "%Y-%m-%d %H:%M %Z"
+        )

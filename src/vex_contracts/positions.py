@@ -17,6 +17,9 @@ class Position(ContractModel):
     volume_lots: Decimal = Field(gt=0)
     average_entry_price_ticks: Decimal
     opened_time_ns: NonNegativeInt
+    entry_order_id: Identifier | None = None
+    entry_client_order_id: Identifier | None = None
+    entry_tags: dict[str, str] = Field(default_factory=dict)
     current_price_ticks: int | None = None
     stop_loss_ticks: int | None = None
     take_profit_ticks: int | None = None
@@ -66,6 +69,9 @@ class Trade(ContractModel):
     exit_time_ns: NonNegativeInt
     entry_price_ticks: Decimal
     exit_price_ticks: Decimal
+    entry_order_id: Identifier | None = None
+    entry_client_order_id: Identifier | None = None
+    entry_tags: dict[str, str] = Field(default_factory=dict)
     stop_loss_ticks: int | None = None
     take_profit_ticks: int | None = None
     gross_pnl: Decimal
@@ -108,7 +114,11 @@ class Trade(ContractModel):
         if self.exit_time_ns < self.entry_time_ns:
             raise ValueError("exit_time_ns must not precede entry_time_ns")
         expected_net = (
-            self.gross_pnl - self.commission - self.spread_cost - self.slippage_cost + self.swap
+            self.gross_pnl
+            - self.commission
+            - self.spread_cost
+            - self.slippage_cost
+            + self.swap
         )
         if self.net_pnl != expected_net:
             raise ValueError("net_pnl must equal the sum of trade components")

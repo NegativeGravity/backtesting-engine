@@ -1,0 +1,46 @@
+{
+  "capabilities": {
+    "bar_events": true,
+    "chart_drawings": true,
+    "custom_series": false,
+    "order_updates": true,
+    "quote_events": false
+  },
+  "default_parameters": {
+    "allow_long": true,
+    "allow_overlapping_daily_chains": true,
+    "allow_short": true,
+    "box_end_minute": 210,
+    "box_start_minute": 90,
+    "draw_box": true,
+    "expected_box_bars": 8,
+    "reward_risk_ratio": "1.5",
+    "session_timezone": "Asia/Tehran",
+    "signal_timeframe": "M15",
+    "strict_box_validation": true,
+    "symbol": "XAUUSD"
+  },
+  "description": "YJ XAUUSD M15 Tehran box breakout with independent overlapping daily chains, hedged positions, current-balance sizing, 1.5R targets, conservative intrabar handling, and one reversal per chain.",
+  "entrypoint": "yj_box_breakout.strategy:YjBoxBreakoutStrategy",
+  "name": "YJ Tehran Parallel Daily-Chain Box Breakout",
+  "schema_version": "1.0.0",
+  "strategy_id": "yj_box_breakout",
+  "subscriptions": [
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "XAUUSD",
+      "timeframe": "M15"
+    }
+  ],
+  "tags": [
+    "xauusd",
+    "m15",
+    "box_breakout",
+    "reversal",
+    "hedging",
+    "overlapping_positions",
+    "parallel_daily_chains",
+    "yj"
+  ],
+  "version": "1.7.3"
+}

@@ -1,2 +1,0 @@
-{"fields":{"box_end_minute":210,"box_start_minute":90,"expected_box_bars":8,"reward_risk":1.5,"session_timezone":"Asia/Tehran","strict_box_validation":false,"symbol":"XAUUSD","timeframe":"M15","two_sided_breakout":true},"level":"info","message":"yj_box_breakout_started","sequence":1,"time_ns":1735779600000000000}
-{"fields":{"active_visuals":0,"reason":"cancelled","tracked_boxes":0},"level":"info","message":"yj_box_breakout_stopped","sequence":2,"time_ns":1735779600000000000}

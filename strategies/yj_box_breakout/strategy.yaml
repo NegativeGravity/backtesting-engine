@@ -1,9 +1,9 @@
 schema_version: 1.0.0
 strategy_id: yj_box_breakout
-name: YJ Tehran 01:30-03:30 Box Breakout
-version: 1.1.0
+name: YJ Tehran Parallel Daily-Chain Box Breakout
+version: 1.7.3
 entrypoint: yj_box_breakout.strategy:YjBoxBreakoutStrategy
-description: XAUUSD M15 Tehran 01:30-03:30 two-sided box breakout with 1 percent balance risk, 1.5R target, conservative intrabar resolution, and one automatic stop-and-reverse leg.
+description: YJ XAUUSD M15 Tehran box breakout with independent overlapping daily chains, hedged positions, current-balance sizing, 1.5R targets, conservative intrabar handling, and one reversal per chain.
 subscriptions:
   - symbol: XAUUSD
     timeframe: M15
@@ -26,9 +26,13 @@ default_parameters:
   allow_short: true
   draw_box: true
   strict_box_validation: true
+  allow_overlapping_daily_chains: true
 tags:
   - xauusd
   - m15
   - box_breakout
   - reversal
+  - hedging
+  - overlapping_positions
+  - parallel_daily_chains
   - yj
