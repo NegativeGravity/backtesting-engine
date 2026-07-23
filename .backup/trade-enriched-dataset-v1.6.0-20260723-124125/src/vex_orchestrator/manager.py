@@ -79,7 +79,7 @@ class LiveBacktestJob:
         project_root: Path,
         package: StrategyPackage,
         request: LiveRunCreateRequest,
-        replay_ready_callback: Callable[[str], None],
+        replay_ready_callback: Callable[[], None],
     ) -> None:
         self.project_root = project_root
         self.package = package
@@ -473,15 +473,13 @@ class LiveBacktestJob:
         if live_report is None:
             raise RuntimeError("live session completed without a strategy report")
         journal = self._require_journal()
-        broker = self._require_session().broker
-        journal.finalize(live_report, broker)
-        self._replay_ready_callback(self.run_id)
+        journal.finalize(live_report, self._require_session().broker)
+        self._replay_ready_callback()
         with self._condition:
             self._status = "completed"
             self._replay_ready = True
             self._touch_unlocked()
         self._publish_state()
-        journal.export_trade_analysis(broker)
 
     def _replace_session(self) -> None:
         if self._journal is not None:
@@ -692,9 +690,7 @@ class LiveBacktestJob:
             self._last_publish_monotonic = time.monotonic() if now is None else now
             subscribers = tuple(self._subscribers)
             recent_bars = (
-                {key: tuple(value) for key, value in self._recent_bars.items()}
-                if bar_reset
-                else {}
+                {key: tuple(value) for key, value in self._recent_bars.items()} if bar_reset else {}
             )
             state = self._state_unlocked()
         for subscriber in subscribers:
@@ -710,13 +706,7 @@ class LiveBacktestJob:
                     if bar.symbol == subscriber.symbol and bar.timeframe is subscriber.timeframe
                 )
             selected_bars = tuple(self._replay_bar(bar) for bar in selected_source)
-            frame_type = (
-                "reset"
-                if bar_reset
-                else "completed"
-                if result.completed
-                else "advance"
-            )
+            frame_type = "reset" if bar_reset else "completed" if result.completed else "advance"
             frame = ReplayFrame(
                 frame_type=frame_type,
                 cursor_sequence=result.processed_execution_bars,
@@ -751,7 +741,6 @@ class LiveBacktestJob:
                 recent[-1] = bar
             elif not recent or recent[-1].sequence < bar.sequence:
                 recent.append(bar)
-
 
     def _publish_interval_unlocked(self) -> float:
         if self.visualization_mode == "turbo":
@@ -994,11 +983,7 @@ class LiveBacktestJob:
             losing_trades=statistics.losing_trades,
             long_trades=statistics.long_trades,
             short_trades=statistics.short_trades,
-            win_rate=(
-                Decimal(statistics.winning_trades * 100) / total
-                if total
-                else Decimal("0")
-            ),
+            win_rate=(Decimal(statistics.winning_trades * 100) / total if total else Decimal("0")),
             profit_factor=(
                 statistics.gross_profit / statistics.gross_loss
                 if statistics.gross_loss > 0
@@ -1152,7 +1137,7 @@ class LiveBacktestManager:
             self.project_root,
             package,
             request,
-            self._replay_ready,
+            self.replay_repository.refresh,
         )
         with self._lock:
             if job.run_id in self._jobs:
@@ -1167,38 +1152,6 @@ class LiveBacktestManager:
             self._jobs[job.run_id] = job
         job.start()
         return job.state()
-
-    def _replay_ready(self, run_id: str) -> None:
-        self.replay_repository.refresh()
-        descriptor = self.replay_repository.descriptor(run_id)
-        final_bootstrap = self.replay_repository.bootstrap(
-            run_id,
-            cursor_time_ns=descriptor.end_time_ns,
-            history_count=5_000,
-        )
-        bundle_root = self.project_root / "data/replay/runs" / run_id
-        dump_json(final_bootstrap, bundle_root / "final-chart-bootstrap.json")
-        dump_json(
-            {
-                "run_id": run_id,
-                "cursor_time_ns": final_bootstrap.cursor_time_ns,
-                "cursor_sequence": final_bootstrap.cursor_sequence,
-                "symbol": final_bootstrap.symbol,
-                "timeframe": final_bootstrap.timeframe.value,
-                "bar_count": len(final_bootstrap.bars),
-                "timeline_item_count": len(final_bootstrap.timeline),
-                "trade_count": len(final_bootstrap.trades),
-                "source": "finalized_replay",
-                "persistent_replay": True,
-                "full_history_available": True,
-                "history_loading": "range_based",
-                "bootstrap_history_count": 5_000,
-                "bootstrap_path": (
-                    bundle_root / "final-chart-bootstrap.json"
-                ).relative_to(self.project_root).as_posix(),
-            },
-            bundle_root / "final-chart-manifest.json",
-        )
 
     def get(self, run_id: str) -> LiveBacktestJob:
         with self._lock:

@@ -9,7 +9,6 @@ from typing import Annotated, Any, cast
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from pydantic import ValidationError
 
 from vex_contracts.mt5 import Mt5CompatibilityReport
@@ -237,35 +236,6 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         except ReplayRunNotFoundError as exc:
             raise HTTPException(status_code=404, detail=f"run not found: {exc.args[0]}") from exc
 
-    @app.get("/api/runs/{run_id}/artifacts")
-    def run_artifacts(run_id: str) -> Any:
-        artifacts = _run_artifact_paths(root, run_id)
-        if not artifacts:
-            raise HTTPException(status_code=404, detail=f"run artifacts not found: {run_id}")
-        return {
-            "run_id": run_id,
-            "artifacts": [
-                {
-                    "artifact_id": artifact_id,
-                    "filename": path.name,
-                    "size_bytes": path.stat().st_size,
-                    "download_url": f"/api/runs/{run_id}/artifacts/{artifact_id}",
-                }
-                for artifact_id, path in sorted(artifacts.items())
-            ],
-        }
-
-    @app.get("/api/runs/{run_id}/artifacts/{artifact_id}")
-    def download_run_artifact(run_id: str, artifact_id: str) -> FileResponse:
-        artifacts = _run_artifact_paths(root, run_id)
-        path = artifacts.get(artifact_id)
-        if path is None or not path.is_file():
-            raise HTTPException(
-                status_code=404,
-                detail=f"run artifact not found: {run_id}/{artifact_id}",
-            )
-        return FileResponse(path, filename=path.name)
-
     @app.websocket("/api/replay/{run_id}/ws")
     async def replay_socket(
         websocket: WebSocket,
@@ -359,13 +329,7 @@ async def _stored_replay_socket(
     timeframe: Timeframe | None,
 ) -> None:
     try:
-        session, initial = ReplaySession.create(
-            repository,
-            run_id,
-            symbol,
-            timeframe,
-            start_at_end=True,
-        )
+        session, initial = ReplaySession.create(repository, run_id, symbol, timeframe)
     except ReplayRunNotFoundError:
         await websocket.send_json({"type": "error", "detail": f"run not found: {run_id}"})
         await websocket.close(code=4404)
@@ -442,33 +406,6 @@ async def _apply_replay_command(
         await websocket.send_json({"type": "bootstrap", "data": result.model_dump(mode="json")})
         return
     raise ValueError(f"unsupported replay action: {command.action}")
-
-
-def _run_artifact_paths(root: Path, run_id: str) -> dict[str, Path]:
-    runs_root = (root / "data/replay/runs").resolve()
-    bundle_root = (runs_root / run_id).resolve()
-    if not bundle_root.is_relative_to(runs_root) or not bundle_root.is_dir():
-        return {}
-    candidates: dict[str, Path] = {
-        "final_chart_bootstrap": bundle_root / "final-chart-bootstrap.json",
-        "final_chart_manifest": bundle_root / "final-chart-manifest.json",
-        "trade_analysis_status": bundle_root / "trade-analysis-status.json",
-        "trade_analysis_result": bundle_root / "trade-analysis-result.json",
-        "trades_csv": bundle_root / "trade-analysis/trades.csv",
-        "trades_parquet": bundle_root / "trade-analysis/trades.parquet",
-        "candle_trade_map": bundle_root / "trade-analysis/candle-trade-map.parquet",
-        "trade_summary": bundle_root / "trade-analysis/summary.json",
-        "trade_manifest": bundle_root / "trade-analysis/manifest.json",
-    }
-    market_root = bundle_root / "trade-analysis/market-with-trades"
-    if market_root.is_dir():
-        for path in sorted(market_root.glob("*.parquet")):
-            candidates[f"market_{path.stem}"] = path
-    return {
-        key: path.resolve()
-        for key, path in candidates.items()
-        if path.is_file() and path.resolve().is_relative_to(bundle_root)
-    }
 
 
 def main() -> int:

@@ -2,7 +2,6 @@ import hashlib
 import json
 import shutil
 import sqlite3
-from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Literal, cast
@@ -25,24 +24,17 @@ from vex_contracts.symbol import SymbolProfile
 from vex_data_engine.catalog import ParquetBarStore
 from vex_replay.builder import (
     _KIND_PRIORITY,
+    ReplayBundleBuilder,
+    SqliteReplayObserver,
     _copy_strategy_source,
     _json,
     _metrics,
     _source_digest,
-    ReplayBundleBuilder,
-    SqliteReplayObserver,
 )
-from vex_replay.trade_enrichment import export_trade_enriched_datasets
-
 from vex_strategy.session import StrategyStepResult, datetime_to_ns
 
 
 class LiveReplayJournal:
-    """Single-pass replay persistence for long-running live backtests.
-
-    The live strategy/broker pass writes the replay database incrementally. Finalization
-    only materializes indexes, analytics and manifests; it never reruns the strategy.
-    """
 
     def __init__(
         self,
@@ -83,7 +75,6 @@ class LiveReplayJournal:
         self._action_sequence = 0
         self._log_sequence = 0
         self._closed = False
-        self._actual_end_time_ns: int | None = None
 
     def record_step(self, result: StrategyStepResult) -> None:
         if self._closed:
@@ -113,7 +104,6 @@ class LiveReplayJournal:
                 self._log_sequence,
                 cast(dict[str, JsonValue], canonical_data(record)),
             )
-
 
     def timeline_between(
         self,
@@ -194,7 +184,6 @@ class LiveReplayJournal:
         self.connection.close()
         self._closed = True
 
-        self._actual_end_time_ns = report.broker_report.final_account.timestamp_ns
         dump_json(report, self.bundle_root / "strategy-report.json")
         analytics_path = self.bundle_root / "analytics-report.json"
         dump_json(analytics, analytics_path)
@@ -242,9 +231,7 @@ class LiveReplayJournal:
             available_timeframes=timeframes,
             start_time_ns=datetime_to_ns(self.run.start_time),
             end_time_ns=report.broker_report.final_account.timestamp_ns,
-            import_report_path=self.import_report_path.relative_to(
-                self.project_root
-            ).as_posix(),
+            import_report_path=self.import_report_path.relative_to(self.project_root).as_posix(),
             sqlite_path=self.database_path.relative_to(self.project_root).as_posix(),
             symbol_profile_paths=(
                 (self.bundle_root / "symbol-profiles.json")
@@ -282,89 +269,6 @@ class LiveReplayJournal:
         )
         dump_json(result, self.bundle_root / "build-result.json")
         return result
-
-    def export_trade_analysis(self, broker: BrokerSimulator) -> bool:
-        status_path = self.bundle_root / "trade-analysis-status.json"
-        try:
-            dump_json(
-                {
-                    "run_id": self.run.run_id,
-                    "status": "running",
-                    "started_at": datetime.now(UTC).isoformat(),
-                },
-                status_path,
-            )
-            store = ParquetBarStore.from_report_path(
-                self.project_root,
-                self.import_report_path,
-            )
-            enrichment = export_trade_enriched_datasets(
-                project_root=self.project_root,
-                bundle_root=self.bundle_root,
-                run=self.run,
-                descriptor=self.descriptor,
-                store=store,
-                profiles=self.profiles,
-                trades=broker.trades,
-                analysis_end_time_ns=self._actual_end_time_ns,
-            )
-            result = {
-                "root": enrichment.root.relative_to(self.project_root).as_posix(),
-                "trades_csv": enrichment.trades_csv.relative_to(
-                    self.project_root
-                ).as_posix(),
-                "trades_parquet": enrichment.trades_parquet.relative_to(
-                    self.project_root
-                ).as_posix(),
-                "candle_trade_map": enrichment.candle_trade_map.relative_to(
-                    self.project_root
-                ).as_posix(),
-                "summary_json": enrichment.summary_json.relative_to(
-                    self.project_root
-                ).as_posix(),
-                "manifest_json": enrichment.manifest_json.relative_to(
-                    self.project_root
-                ).as_posix(),
-                "execution_dataset": (
-                    enrichment.execution_dataset.relative_to(
-                        self.project_root
-                    ).as_posix()
-                    if enrichment.execution_dataset is not None
-                    else None
-                ),
-                "market_datasets": [
-                    path.relative_to(self.project_root).as_posix()
-                    for path in enrichment.market_datasets
-                ],
-            }
-            dump_json(result, self.bundle_root / "trade-analysis-result.json")
-            dump_json(
-                {
-                    "run_id": self.run.run_id,
-                    "status": "completed",
-                    "finished_at": datetime.now(UTC).isoformat(),
-                    "result_path": (
-                        self.bundle_root / "trade-analysis-result.json"
-                    ).relative_to(self.project_root).as_posix(),
-                },
-                status_path,
-            )
-        except Exception as exc:
-            try:
-                dump_json(
-                    {
-                        "run_id": self.run.run_id,
-                        "status": "failed",
-                        "finished_at": datetime.now(UTC).isoformat(),
-                        "error_type": type(exc).__name__,
-                        "error": str(exc),
-                    },
-                    status_path,
-                )
-            except Exception:
-                pass
-            return False
-        return True
 
     def reset(self) -> None:
         if not self._closed:

@@ -24,20 +24,8 @@ class ReplaySession:
         run_id: str,
         symbol: str | None = None,
         timeframe: Timeframe | None = None,
-        start_at_end: bool = False,
     ) -> tuple["ReplaySession", ReplayBootstrap]:
-        cursor_time_ns = (
-            repository.descriptor(run_id).end_time_ns
-            if start_at_end
-            else None
-        )
-        bootstrap = repository.bootstrap(
-            run_id,
-            symbol,
-            timeframe,
-            cursor_time_ns=cursor_time_ns,
-            history_count=5_000 if start_at_end else 500,
-        )
+        bootstrap = repository.bootstrap(run_id, symbol, timeframe)
         return (
             cls(
                 repository=repository,

@@ -11,7 +11,7 @@ import httpx
 import uvicorn
 import websockets
 from fastapi import FastAPI, Request, Response, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from websockets.asyncio.client import ClientConnection
 
@@ -52,43 +52,6 @@ def create_app(
             for key, value in request.headers.items()
             if key.lower() in {"content-type", "accept", "authorization"}
         }
-        if request.method == "GET" and "/artifacts/" in f"/{path}":
-            upstream_request = client.build_request(
-                request.method,
-                f"/api/{path}",
-                params=request.query_params,
-                headers=headers,
-            )
-            upstream_response = await client.send(upstream_request, stream=True)
-            passthrough = {
-                key: value
-                for key, value in upstream_response.headers.items()
-                if key.lower()
-                in {
-                    "content-type",
-                    "content-length",
-                    "content-disposition",
-                    "cache-control",
-                    "etag",
-                    "last-modified",
-                    "accept-ranges",
-                    "content-range",
-                }
-            }
-
-            async def iter_body() -> AsyncGenerator[bytes, None]:
-                try:
-                    async for chunk in upstream_response.aiter_bytes():
-                        yield chunk
-                finally:
-                    await upstream_response.aclose()
-
-            return StreamingResponse(
-                iter_body(),
-                status_code=upstream_response.status_code,
-                headers=passthrough,
-            )
-
         response = await client.request(
             request.method,
             f"/api/{path}",
