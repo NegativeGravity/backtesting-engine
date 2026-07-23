@@ -35,11 +35,6 @@ from vex_strategy.session import StrategyStepResult, datetime_to_ns
 
 
 class LiveReplayJournal:
-    """Single-pass replay persistence for long-running live backtests.
-
-    The live strategy/broker pass writes the replay database incrementally. Finalization
-    only materializes indexes, analytics and manifests; it never reruns the strategy.
-    """
 
     def __init__(
         self,
