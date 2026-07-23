@@ -1,0 +1,61 @@
+{
+  "capabilities": {
+    "bar_events": true,
+    "chart_drawings": true,
+    "custom_series": false,
+    "order_updates": true,
+    "quote_events": false
+  },
+  "default_parameters": {
+    "cover_reward_risk": "1",
+    "daily_loss_limit_r": "-4",
+    "delta_source_timeframe": "M1",
+    "draw_raw_confirmations": false,
+    "draw_session_range": true,
+    "enable_cover": true,
+    "maximum_positions_per_day": 5,
+    "maximum_primary_take_profits_per_day": 2,
+    "maximum_structure_age": 3,
+    "minimum_m2_bars": 7,
+    "monthly_loss_limit_r": "-8",
+    "monthly_pause_target_r": "6",
+    "monthly_profit_target_r": "8",
+    "pause_loss_threshold_r": "-7",
+    "primary_reward_risk": "2",
+    "risk_accounting_mode": "nominal",
+    "session_end_minute": 1170,
+    "session_start_minute": 720,
+    "session_timezone": "Asia/Tehran",
+    "signal_timeframe": "M15",
+    "symbol": "US30"
+  },
+  "description": "Mechanical US30 M15 LS and engulf strategy with opposite-sign two-minute volume-delta confirmation, primary 2R entries, automatic 1R cover reversals, and transcript-derived daily/monthly risk gates.",
+  "entrypoint": "ls_volume_delta.strategy:LsVolumeDeltaStrategy",
+  "name": "LS + 2m Volume Delta TopinTrade — US30",
+  "schema_version": "1.0.0",
+  "strategy_id": "ls_volume_delta",
+  "subscriptions": [
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "US30",
+      "timeframe": "M1"
+    },
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "US30",
+      "timeframe": "M15"
+    }
+  ],
+  "tags": [
+    "us30",
+    "dow_jones",
+    "m15",
+    "ls",
+    "volume_delta",
+    "engulf",
+    "cover",
+    "mechanical",
+    "topintrade"
+  ],
+  "version": "1.0.1"
+}

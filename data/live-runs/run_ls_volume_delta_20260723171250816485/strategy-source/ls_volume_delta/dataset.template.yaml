@@ -1,0 +1,30 @@
+schema_version: 1.0.0
+dataset_id: us30usd_mt5_ls
+version: "1"
+name: US30USD M1 and M15 LS Volume Delta Dataset
+source: mt5_csv
+root_path: data/mt5
+price_basis: bid
+source_timezone: UTC
+engine_timezone: UTC
+files:
+  - symbol: US30USD
+    timeframe: M1
+    relative_path: US30_M1_202501020101_202607222358.csv
+    declared_start: 2025-01-01T00:00:00Z
+    declared_end: REPLACE_WITH_AWARE_ISO_TIME
+    row_count: 1
+    size_bytes: 1
+    sha256: REPLACE_WITH_SHA256
+  - symbol: US30USD
+    timeframe: M15
+    relative_path: REPLACE_WITH_US30USD_M15.csv
+    declared_start: REPLACE_WITH_AWARE_ISO_TIME
+    declared_end: REPLACE_WITH_AWARE_ISO_TIME
+    row_count: 1
+    size_bytes: 1
+    sha256: REPLACE_WITH_SHA256
+metadata:
+  source_chart_required_for_exact_delta_parity: OANDA_US30USD
+  volume_requirement: M1 volume or tick_volume must be present and nonzero
+  warning: MT5 tick volume can produce different Delta signs from TradingView OANDA volume

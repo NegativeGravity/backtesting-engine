@@ -40,8 +40,10 @@ class PositionState:
     average_entry_price_ticks: Decimal
     opened_time_ns: int
     entry_order_id: str
-    stop_loss_ticks: int | None
-    take_profit_ticks: int | None
+    entry_client_order_id: str = ""
+    entry_tags: dict[str, str] = field(default_factory=dict)
+    stop_loss_ticks: int | None = None
+    take_profit_ticks: int | None = None
     stop_order_id: str | None = None
     take_profit_order_id: str | None = None
     entry_commission: Decimal = ZERO

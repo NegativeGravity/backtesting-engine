@@ -80,7 +80,7 @@ def test_yj_parameters_preserve_notebook_defaults() -> None:
 
 def test_yj_dataset_and_session_clocks_are_explicit(project_root: Path) -> None:
     root = project_root / "strategies" / "yj_box_breakout"
-    dataset = DatasetManifest.model_validate(load_yaml(root / "dataset.yaml"))
+    dataset = DatasetManifest.model_validate(load_yaml(root / "dataset.template.yaml"))
     run, descriptor, _, _ = load_context_models(project_root)
 
     assert dataset.dataset_id == "xauusd_mt5_yj_tehran"

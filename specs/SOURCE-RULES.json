@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "instrument": "US30USD",
+  "signal_timeframe": "M15",
+  "delta_intrabar_timeframe": "M2 built from M1",
+  "session": {
+    "timezone": "Asia/Tehran",
+    "start": "12:00",
+    "end": "19:30",
+    "source_status": "timezone inferred from Persian chart workflow; configurable"
+  },
+  "ls": {
+    "long": [
+      "lower_shadow > body",
+      "lower_shadow > upper_shadow",
+      "upper_shadow < 7 * body"
+    ],
+    "short": [
+      "upper_shadow > body",
+      "upper_shadow > lower_shadow",
+      "lower_shadow < 7 * body"
+    ],
+    "strict_inequalities": true
+  },
+  "volume_delta": {
+    "short_requires": "positive",
+    "long_requires": "negative",
+    "method": "TradingView official lower-timeframe direction classification",
+    "causality": "only fully closed M2 bars inside the M15 bar"
+  },
+  "structures": {
+    "high": "bullish then bearish",
+    "low": "bearish then bullish",
+    "strict_hunt": true,
+    "intervening_wick_filter": true,
+    "signal_breakout_exception": true,
+    "maximum_recent_formed_each_side": 3
+  },
+  "engulf": {
+    "requires_structure": false,
+    "short": "previous bullish, current bearish, new strict session high, sweep previous body high, positive delta",
+    "long": "previous bearish, current bullish, new strict session low, sweep previous body low, negative delta"
+  },
+  "execution": {
+    "entry": "M15 close represented by next M1 open",
+    "primary_stop": "signal wick",
+    "primary_target_r": 2,
+    "cover_entry": "primary stop via broker stop-and-reverse",
+    "cover_stop": "opposite edge of signal body",
+    "cover_target_r": 1,
+    "intrabar_default": "M1 conservative; S1/tick required for exact same-candle ordering"
+  },
+  "risk": {
+    "risk_percent_per_position": 1,
+    "maximum_positions_per_day_including_cover": 5,
+    "maximum_primary_take_profits_per_day": 2,
+    "daily_loss_limit_r": -4,
+    "monthly_pause_before_day_15_r": 6,
+    "monthly_profit_target_r": 8,
+    "monthly_loss_limit_r": -8,
+    "minus_seven_pause": "remainder of current day",
+    "accounting_default": "nominal R",
+    "one_active_chain": "explicit deterministic interpretation"
+  },
+  "data_fidelity": {
+    "exact_delta_feed": "OANDA US30USD M1 volume",
+    "mt5_tick_volume": "proxy; may change signal set"
+  }
+}

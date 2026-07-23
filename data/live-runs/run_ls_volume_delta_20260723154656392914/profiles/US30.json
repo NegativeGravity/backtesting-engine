@@ -1,0 +1,29 @@
+{
+  "calculation_mode": "cfd",
+  "currency_base": "USD",
+  "currency_margin": "USD",
+  "currency_profit": "USD",
+  "digits": 1,
+  "freeze_level_points": 0,
+  "margin_initial": "0",
+  "margin_maintenance": "0",
+  "metadata": {
+    "cash_margin_parity": "replace with verified MT5 profile for broker-exact cash and margin",
+    "signal_parity": "price and R based",
+    "verification_status": "derived_from_us30_csv_for_research"
+  },
+  "point": "0.1",
+  "profile_id": "mt5_us30_ls",
+  "schema_version": "1.0.0",
+  "stops_level_points": 0,
+  "symbol": "US30",
+  "trade_contract_size": "1",
+  "trade_tick_size": "0.1",
+  "trade_tick_value": "0.1",
+  "trade_tick_value_loss": "0.1",
+  "trade_tick_value_profit": "0.1",
+  "version": "1.0.1",
+  "volume_max": "100",
+  "volume_min": "0.01",
+  "volume_step": "0.01"
+}

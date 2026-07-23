@@ -1,0 +1,54 @@
+//@version=6
+indicator("LS TopinTrade", overlay=true, max_labels_count=500, max_lines_count=500)
+
+enableEarlyAlert = input.bool(true, "Enable Early Alert", group="Alert Settings")
+minutesBeforeClose = input.int(2, "Minutes Before Candle Close", minval=0, maxval=60, group="Alert Settings")
+enableSessionFilter = input.bool(true, "Activate Session Filter", group="Session Settings")
+sessionChoice = input.string("Tehran", "Trading Session", options=["Tehran", "New York", "London", "Asia", "Custom"], group="Session Settings")
+customSession1 = input.session("0000-0830", "Custom Session 1", group="Session Settings")
+customSession2 = input.session("1530-2030", "Custom Session 2", group="Session Settings")
+
+var string s1 = na
+var string s2 = na
+
+if sessionChoice == "Tehran"
+    s1 := "0700-2100"
+    s2 := "1530-2030"
+else if sessionChoice == "New York"
+    s1 := "1330-2000"
+    s2 := na
+else if sessionChoice == "London"
+    s1 := "0700-1630"
+    s2 := na
+else if sessionChoice == "Asia"
+    s1 := "0000-0900"
+    s2 := na
+else if sessionChoice == "Custom"
+    s1 := customSession1
+    s2 := customSession2
+
+inSession1 = not na(s1) and not na(time(timeframe.period, s1))
+inSession2 = not na(s2) and not na(time(timeframe.period, s2))
+inSession = inSession1 or inSession2
+
+timeframeMs = timeframe.in_seconds() * 1000
+timeElapsed = timenow - time
+timeRemaining = timeframeMs - timeElapsed
+minutesRemaining = timeRemaining / 60000
+inAlertWindow = enableEarlyAlert and minutesRemaining <= minutesBeforeClose and minutesRemaining > 0
+
+f_lsCondition() =>
+    body = math.abs(close - open)
+    upperShadow = high - math.max(open, close)
+    lowerShadow = math.min(open, close) - low
+    longLS = lowerShadow > 1 * body and lowerShadow > 1 * upperShadow and upperShadow < 7.0 * body
+    shortLS = upperShadow > 1 * body and upperShadow > 1 * lowerShadow and lowerShadow < 7.0 * body
+    [longLS, shortLS]
+
+[longLS, shortLS] = f_lsCondition()
+showLong = longLS
+showShort = shortLS
+
+bgcolor(enableSessionFilter and inSession ? color.new(color.green, 90) : na)
+plotshape((not enableSessionFilter or inSession) and showLong, title="Long LS Pattern", location=location.belowbar, color=color.green, style=shape.triangleup, size=size.small)
+plotshape((not enableSessionFilter or inSession) and showShort, title="Short LS Pattern", location=location.abovebar, color=color.red, style=shape.triangledown, size=size.small)

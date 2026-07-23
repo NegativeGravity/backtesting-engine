@@ -1,0 +1,27 @@
+schema_version: 1.0.0
+profile_id: mt5_us30_ls
+version: 1.0.1
+symbol: US30
+digits: 1
+point: '0.1'
+trade_tick_size: '0.1'
+trade_tick_value: '0.1'
+trade_tick_value_profit: '0.1'
+trade_tick_value_loss: '0.1'
+trade_contract_size: '1'
+volume_min: '0.01'
+volume_max: '100'
+volume_step: '0.01'
+stops_level_points: 0
+freeze_level_points: 0
+calculation_mode: cfd
+currency_base: USD
+currency_profit: USD
+currency_margin: USD
+margin_initial: '0'
+margin_maintenance: '0'
+metadata:
+  verification_status: derived_from_us30_csv_for_research
+  signal_parity: price and R based
+  cash_margin_parity: replace with verified MT5 profile for broker-exact cash and
+    margin

@@ -1,0 +1,101 @@
+schema_version: 1.0.0
+run_id: run_us30_ls_volume_delta_v1_0_1
+name: US30 LS + 2m Volume Delta — Full Dataset
+strategy:
+  strategy_id: ls_volume_delta
+  version: 1.0.1
+  instance_id: ls_volume_delta_us30_primary
+  parameters:
+    symbol: US30
+    signal_timeframe: M15
+    delta_source_timeframe: M1
+    session_timezone: Asia/Tehran
+    session_start_minute: 720
+    session_end_minute: 1170
+    primary_reward_risk: "2"
+    cover_reward_risk: "1"
+    minimum_m2_bars: 7
+    maximum_structure_age: 3
+    maximum_positions_per_day: 5
+    maximum_primary_take_profits_per_day: 2
+    daily_loss_limit_r: "-4"
+    monthly_loss_limit_r: "-8"
+    monthly_pause_target_r: "6"
+    monthly_profit_target_r: "8"
+    pause_loss_threshold_r: "-7"
+    risk_accounting_mode: nominal
+    enable_cover: true
+    draw_session_range: true
+    draw_raw_confirmations: false
+dataset:
+  dataset_id: us30_mt5_ls
+  version: "1"
+symbol_profiles:
+  - profile_id: mt5_us30_ls
+    version: 1.0.1
+start_time: 2025-01-02T01:01:00+03:30
+end_time: 2026-07-22T23:45:00+03:30
+execution_timeframe: M1
+subscriptions:
+  - symbol: US30
+    timeframe: M1
+    higher_timeframe_access: closed_only
+  - symbol: US30
+    timeframe: M15
+    higher_timeframe_access: closed_only
+account:
+  schema_version: 1.0.0
+  currency: USD
+  initial_balance: "100000"
+  leverage: "100"
+  position_mode: hedging
+  margin_call_level_percent: "100"
+  stop_out_level_percent: "50"
+  allow_negative_balance: false
+execution:
+  schema_version: 1.0.0
+  signal_execution_policy: next_bar_open
+  pending_order_activation_policy: next_bar
+  intrabar_policy: conservative
+  gap_policy: marketable_open
+  spread:
+    mode: historical
+    fallback_points: 0
+    use_fallback_when_zero: true
+    minimum_points: 0
+    maximum_points: null
+  commission:
+    mode: none
+  slippage:
+    mode: fixed
+    market_order_points: 0
+    stop_order_points: 0
+    limit_order_points: 0
+  allow_same_bar_exit_after_open_fill: true
+risk:
+  schema_version: 1.0.0
+  default_sizing:
+    mode: risk_percent
+    risk_percent: "1"
+  max_open_positions: 1
+  max_symbol_positions: 1
+  allow_pyramiding: false
+  allow_long: true
+  allow_short: true
+  max_margin_usage_percent: "90"
+replay:
+  enabled: true
+  snapshot_interval_events: 5000
+  persist_chart_commands: true
+  persist_account_snapshots: true
+random_seed: 42
+metadata:
+  source_video: NGMRNVuGpw8
+  source_indicator: LS TopinTrade v2.0 simplified
+  instrument: US30_Dow_Jones
+  data_files: US30_M1_202501020101_202607222358,US30_M15_202501020100_202607222345
+  session_timezone_assumption: Asia/Tehran
+  entry_model: M15 close represented by next M1 open
+  volume_delta_model: clock-aligned fully-closed M2 bars built causally from M1 volume
+  primary_target_r: "2"
+  cover_target_r: "1"

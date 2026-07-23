@@ -1,0 +1,122 @@
+{
+  "account": {
+    "allow_negative_balance": false,
+    "currency": "USD",
+    "initial_balance": "100000",
+    "leverage": "100",
+    "margin_call_level_percent": "100",
+    "position_mode": "hedging",
+    "schema_version": "1.0.0",
+    "stop_out_level_percent": "50"
+  },
+  "dataset": {
+    "dataset_id": "us30_mt5_ls",
+    "version": "1"
+  },
+  "end_time": "2026-07-22T23:45:00+03:30",
+  "execution": {
+    "allow_same_bar_exit_after_open_fill": true,
+    "commission": {
+      "mode": "none"
+    },
+    "gap_policy": "marketable_open",
+    "intrabar_policy": "conservative",
+    "pending_order_activation_policy": "next_bar",
+    "schema_version": "1.0.0",
+    "signal_execution_policy": "next_bar_open",
+    "slippage": {
+      "limit_order_points": 0,
+      "market_order_points": 0,
+      "mode": "fixed",
+      "stop_order_points": 0
+    },
+    "spread": {
+      "fallback_points": 0,
+      "minimum_points": 0,
+      "mode": "historical",
+      "use_fallback_when_zero": true
+    }
+  },
+  "execution_timeframe": "M1",
+  "metadata": {
+    "cover_target_r": "1",
+    "data_files": "US30_M1_202501020101_202607222358,US30_M15_202501020100_202607222345",
+    "entry_model": "M15 close represented by next M1 open",
+    "instrument": "US30_Dow_Jones",
+    "primary_target_r": "2",
+    "session_timezone_assumption": "Asia/Tehran",
+    "source_indicator": "LS TopinTrade v2.0 simplified",
+    "source_video": "NGMRNVuGpw8",
+    "volume_delta_model": "clock-aligned fully-closed M2 bars built causally from M1 volume"
+  },
+  "name": "US30 LS + 2m Volume Delta — Full Dataset [run_ls_volume_delta_20260723171833957909]",
+  "random_seed": 42,
+  "replay": {
+    "enabled": true,
+    "persist_account_snapshots": true,
+    "persist_chart_commands": true,
+    "snapshot_interval_events": 5000
+  },
+  "risk": {
+    "allow_long": true,
+    "allow_pyramiding": false,
+    "allow_short": true,
+    "default_sizing": {
+      "mode": "risk_percent",
+      "risk_percent": "1"
+    },
+    "max_margin_usage_percent": "90",
+    "max_open_positions": 1,
+    "max_symbol_positions": 1,
+    "schema_version": "1.0.0"
+  },
+  "run_id": "run_ls_volume_delta_20260723171833957909",
+  "schema_version": "1.0.0",
+  "start_time": "2025-01-02T01:01:00+03:30",
+  "strategy": {
+    "instance_id": "run_ls_volume_delta_20260723171833957909.strategy",
+    "parameters": {
+      "cover_reward_risk": "1",
+      "daily_loss_limit_r": "-4",
+      "delta_source_timeframe": "M1",
+      "draw_raw_confirmations": false,
+      "draw_session_range": true,
+      "enable_cover": true,
+      "maximum_positions_per_day": 5,
+      "maximum_primary_take_profits_per_day": 2,
+      "maximum_structure_age": 3,
+      "minimum_m2_bars": 7,
+      "monthly_loss_limit_r": "-8",
+      "monthly_pause_target_r": "6",
+      "monthly_profit_target_r": "8",
+      "pause_loss_threshold_r": "-7",
+      "primary_reward_risk": "2",
+      "risk_accounting_mode": "nominal",
+      "session_end_minute": 1170,
+      "session_start_minute": 720,
+      "session_timezone": "Asia/Tehran",
+      "signal_timeframe": "M15",
+      "symbol": "US30"
+    },
+    "strategy_id": "ls_volume_delta",
+    "version": "1.0.1"
+  },
+  "subscriptions": [
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "US30",
+      "timeframe": "M1"
+    },
+    {
+      "higher_timeframe_access": "closed_only",
+      "symbol": "US30",
+      "timeframe": "M15"
+    }
+  ],
+  "symbol_profiles": [
+    {
+      "profile_id": "mt5_us30_ls",
+      "version": "1.0.1"
+    }
+  ]
+}

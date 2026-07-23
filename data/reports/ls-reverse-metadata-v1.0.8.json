@@ -1,0 +1,28 @@
+{
+  "changed": false,
+  "backup": null,
+  "notes": [
+    "Simulator already compatible or no safe textual repair needed"
+  ],
+  "broker_audit": {
+    "reverse_functions": [
+      "_execute_stop_and_reverse"
+    ],
+    "uses_position_entry_tags": false,
+    "required_identity_keys": {
+      "strategy": false,
+      "chain_id": false,
+      "trade_date": false
+    },
+    "recursive_control_tags_copied": false
+  },
+  "strategy_checks": {
+    "reverse_normalizer": true,
+    "broker_chain_fallback": true,
+    "single_active_chain_fallback": true,
+    "signal_metadata_reconstruction": true
+  },
+  "strategy_runtime_recovery_ok": true,
+  "broker_identity_enrichment_ok": false,
+  "overall_ok": true
+}

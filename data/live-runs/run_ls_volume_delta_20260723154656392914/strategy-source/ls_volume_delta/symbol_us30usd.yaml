@@ -1,0 +1,25 @@
+schema_version: 1.0.0
+profile_id: mt5_us30usd_verified
+version: 1.0.0
+symbol: US30USD
+digits: 1
+point: "0.1"
+trade_tick_size: "0.1"
+trade_tick_value: "0.1"
+trade_tick_value_profit: "0.1"
+trade_tick_value_loss: "0.1"
+trade_contract_size: "1"
+volume_min: "0.01"
+volume_max: "100"
+volume_step: "0.01"
+stops_level_points: 0
+freeze_level_points: 0
+calculation_mode: cfd
+currency_base: USD
+currency_profit: USD
+currency_margin: USD
+margin_initial: "0"
+margin_maintenance: "0"
+metadata:
+  verification_status: replace_with_mt5_compatibility_snapshot
+  warning: This file is a placeholder and must be replaced with your broker-verified US30USD profile before production backtests.

@@ -1,0 +1,38 @@
+schema_version: 1.0.0
+dataset_id: us30_mt5_ls
+version: '1'
+name: US30 M1 and M15 LS Volume Delta Dataset
+source: mt5_csv
+root_path: data/mt5
+price_basis: bid
+source_timezone: Asia/Tehran
+engine_timezone: UTC
+files:
+- symbol: US30
+  timeframe: M1
+  relative_path: US30_M1_202501020101_202607222358.csv
+  declared_start: '2025-01-02T01:01:00+03:30'
+  declared_end: '2026-07-22T23:58:00+03:30'
+  row_count: 547963
+  size_bytes: 33416870
+  sha256: b6d4ee205ca6191f803e02a39f8020ee87ab08050c9c54f086121b8fb774181a
+- symbol: US30
+  timeframe: M15
+  relative_path: US30_M15_202501020100_202607222345.csv
+  declared_start: '2025-01-02T01:00:00+03:30'
+  declared_end: '2026-07-22T23:45:00+03:30'
+  row_count: 36635
+  size_bytes: 2278577
+  sha256: 0377c626e6f4bb729e086d412ddf50cafe75e0e77112d60d60325c38e101a696
+metadata:
+  strategy: ls_volume_delta
+  instrument: US30_Dow_Jones
+  source_clock: stored_mt5_wall_clock
+  source_timezone: Asia/Tehran
+  session_timezone: Asia/Tehran
+  m1_nonzero_volume_rows: '547963'
+  m1_delimiter: tab
+  m15_delimiter: tab
+  volume_delta: clock-aligned causal M2 bars aggregated from M1
+  trailing_m15_note: the final M15 bar may be marked incomplete when M1 does not include
+    the final minute

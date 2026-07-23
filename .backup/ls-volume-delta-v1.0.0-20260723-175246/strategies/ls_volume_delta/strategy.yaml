@@ -1,0 +1,51 @@
+schema_version: 1.0.0
+strategy_id: ls_volume_delta
+name: LS + 2m Volume Delta TopinTrade
+version: 1.0.0
+entrypoint: ls_volume_delta.strategy:LsVolumeDeltaStrategy
+description: Mechanical US30USD M15 LS and engulf strategy with opposite-sign two-minute volume-delta confirmation, primary 2R entries, automatic 1R cover reversals, and transcript-derived daily/monthly risk gates.
+subscriptions:
+  - symbol: US30USD
+    timeframe: M1
+    higher_timeframe_access: closed_only
+  - symbol: US30USD
+    timeframe: M15
+    higher_timeframe_access: closed_only
+capabilities:
+  chart_drawings: true
+  custom_series: false
+  bar_events: true
+  quote_events: false
+  order_updates: true
+default_parameters:
+  symbol: US30USD
+  signal_timeframe: M15
+  delta_source_timeframe: M1
+  session_timezone: Asia/Tehran
+  session_start_minute: 720
+  session_end_minute: 1170
+  primary_reward_risk: "2"
+  cover_reward_risk: "1"
+  minimum_m2_bars: 7
+  maximum_structure_age: 3
+  maximum_positions_per_day: 5
+  maximum_primary_take_profits_per_day: 2
+  daily_loss_limit_r: "-4"
+  monthly_loss_limit_r: "-8"
+  monthly_pause_target_r: "6"
+  monthly_profit_target_r: "8"
+  pause_loss_threshold_r: "-7"
+  risk_accounting_mode: nominal
+  enable_cover: true
+  draw_session_range: true
+  draw_raw_confirmations: false
+tags:
+  - us30
+  - dow_jones
+  - m15
+  - ls
+  - volume_delta
+  - engulf
+  - cover
+  - mechanical
+  - topintrade

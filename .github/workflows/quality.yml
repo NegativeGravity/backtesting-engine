@@ -28,7 +28,7 @@ jobs:
       - run: uv run pyright
       - run: uv run pytest --cov=vex_contracts --cov=vex_data_engine --cov=vex_broker --cov=vex_strategy --cov=vex_replay --cov=vex_analytics --cov-report=term-missing
       - run: npm run check --prefix apps/dashboard_web
-      - run: uv run vex-contracts validate --kind dataset-manifest --path examples/configs/dataset.yaml
+      - run: uv run vex-contracts validate --kind dataset-manifest --path examples/configs/dataset.template.yaml
       - run: uv run vex-contracts validate --kind data-engine-config --path examples/configs/data_engine.yaml
       - run: uv run vex-contracts validate --kind symbol-profile --path examples/configs/symbol_xauusd.yaml
       - run: uv run vex-contracts validate --kind strategy-descriptor --path examples/configs/strategy.yaml

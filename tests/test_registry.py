@@ -6,7 +6,7 @@ from vex_contracts.serialization import load_yaml
 
 def test_registry_validates_all_primary_examples(project_root: Path) -> None:
     examples = {
-        "dataset-manifest": "dataset.yaml",
+        "dataset-manifest": "dataset.template.yaml",
         "symbol-profile": "symbol_xauusd.yaml",
         "strategy-descriptor": "strategy.yaml",
         "run-config": "run.yaml",
