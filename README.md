@@ -328,3 +328,17 @@ powershell -ExecutionPolicy ByPass -File .\scripts\full-debug.ps1
 ## Release 1.1.0 chart update
 
 The replay workspace now uses a larger chart-first layout, fixed M1/M5/M15/H1/H4/D1 timeframe controls, animation-frame WebSocket coalescing, incremental candle and indicator updates, persistent horizontal scale settings, persistent price-range locking, and chart focus mode. See `docs/chart-replay-performance.md`.
+
+## Million-candle execution mode
+
+Version 1.5.0 adds a bounded-memory execution and visualization path for very large datasets:
+
+- streamed Parquet batches instead of loading the full dataset;
+- trusted in-process strategy runtime to remove per-candle IPC;
+- incremental broker aggregates and bounded strategy snapshots;
+- single-pass append-only replay persistence;
+- Turbo visualization with sampled latest-wins WebSocket updates;
+- a strict 2,400-bar active chart window and time-windowed drawings;
+- exact replay/seek inspection after or during a run.
+
+Use `visualization_mode: turbo` for high-throughput runs. All candles are still processed by the engine; the dashboard intentionally renders a bounded sample and periodically synchronizes the exact latest window so browser frame rate never controls backtest throughput. See `MILLION-CANDLE-ARCHITECTURE-FA.md` for implementation details.

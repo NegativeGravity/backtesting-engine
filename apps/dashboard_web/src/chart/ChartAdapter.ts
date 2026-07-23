@@ -6,11 +6,9 @@ import type {
   PriceRange
 } from "./chartViewport";
 
-export type ChartRenderReason = "data" | "strategy" | "viewport" | "resize";
-
 export interface VisibleTimeRangeNs {
-  from: number;
-  to: number;
+  fromNs: number;
+  toNs: number;
 }
 
 export interface ChartCoordinates {
@@ -28,8 +26,7 @@ export interface ChartAdapter {
   capturePriceRange(): PriceRange | null;
   captureTimeViewport(): CapturedTimeViewport | null;
   visibleTimeRangeNs(): VisibleTimeRangeNs | null;
-  setVisibleTimeRangeNs(range: VisibleTimeRangeNs): void;
   fitContent(): void;
   coordinates(): ChartCoordinates;
-  subscribeRender(handler: (reason: ChartRenderReason) => void): () => void;
+  subscribeRender(handler: () => void): () => void;
 }

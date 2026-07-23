@@ -11,6 +11,7 @@ from pydantic import BaseModel, JsonValue
 
 from vex_analytics.engine import AnalyticsEngine
 from vex_broker.models import BrokerResult
+from vex_broker.simulator import BrokerSimulator
 from vex_contracts.analytics import AnalyticsConfig, EquityCurvePoint
 from vex_contracts.broker import BrokerStateSnapshot
 from vex_contracts.enums import EventType
@@ -31,9 +32,17 @@ from vex_strategy.runner import StrategyBacktestRunner, datetime_to_ns
 
 
 class SqliteReplayObserver(StrategyRunObserver):
-    def __init__(self, connection: sqlite3.Connection, snapshot_interval_bars: int) -> None:
+    def __init__(
+        self,
+        connection: sqlite3.Connection,
+        snapshot_interval_bars: int,
+        equity_sample_interval_bars: int = 1,
+        commit_interval_bars: int = 1_024,
+    ) -> None:
         self.connection = connection
         self.snapshot_interval_bars = snapshot_interval_bars
+        self.equity_sample_interval_bars = max(1, equity_sample_interval_bars)
+        self.commit_interval_bars = max(1, commit_interval_bars)
         self.bar_count = 0
         self.snapshot_count = 0
         self.max_drawdown_amount = Decimal("0")
@@ -51,21 +60,39 @@ class SqliteReplayObserver(StrategyRunObserver):
             self.max_drawdown_percent, snapshot.account.drawdown_percent
         )
         account = snapshot.account
-        self.connection.execute(
-            "INSERT OR REPLACE INTO equity_curve("
-            "time_ns, balance, equity, floating_pnl, margin, drawdown_amount, drawdown_percent"
-            ") VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (
-                snapshot.timestamp_ns,
-                str(account.balance),
-                str(account.equity),
-                str(account.floating_pnl),
-                str(account.margin),
-                str(account.drawdown_amount),
-                str(account.drawdown_percent),
-            ),
+        meaningful_events = tuple(
+            event
+            for event in result.events
+            if event.event_type is not EventType.ACCOUNT_UPDATED
         )
-        self._record_result(result, snapshot, force_snapshot=False)
+        should_sample_equity = (
+            self.bar_count == 1
+            or self.bar_count % self.equity_sample_interval_bars == 0
+            or bool(meaningful_events)
+            or bool(result.trades)
+        )
+        if should_sample_equity:
+            self.connection.execute(
+                "INSERT OR REPLACE INTO equity_curve("
+                "time_ns, balance, equity, floating_pnl, margin, drawdown_amount, drawdown_percent"
+                ") VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    snapshot.timestamp_ns,
+                    str(account.balance),
+                    str(account.equity),
+                    str(account.floating_pnl),
+                    str(account.margin),
+                    str(account.drawdown_amount),
+                    str(account.drawdown_percent),
+                ),
+            )
+        self._record_result(
+            result,
+            snapshot,
+            force_snapshot=bool(meaningful_events),
+        )
+        if self.bar_count % self.commit_interval_bars == 0:
+            self.connection.commit()
 
     def on_broker_result(
         self,
@@ -82,7 +109,12 @@ class SqliteReplayObserver(StrategyRunObserver):
         snapshot: BrokerStateSnapshot,
         force_snapshot: bool,
     ) -> None:
-        for event in result.events:
+        meaningful_events = tuple(
+            event
+            for event in result.events
+            if event.event_type is not EventType.ACCOUNT_UPDATED
+        )
+        for event in meaningful_events:
             payload = cast(dict[str, JsonValue], event.model_dump(mode="json"))
             self._raw(event.event_time_ns, "broker_event", event.sequence, payload)
             self.connection.execute(
@@ -101,7 +133,7 @@ class SqliteReplayObserver(StrategyRunObserver):
             force_snapshot
             or self.bar_count == 1
             or self.bar_count % self.snapshot_interval_bars == 0
-            or bool(result.events)
+            or bool(meaningful_events)
             or bool(result.trades)
         )
         if should_snapshot:
@@ -111,9 +143,7 @@ class SqliteReplayObserver(StrategyRunObserver):
                 "VALUES (?, ?, ?)",
                 (snapshot.timestamp_ns, snapshot.event_sequence, _json(account_payload)),
             )
-            state_changed = any(
-                event.event_type is not EventType.ACCOUNT_UPDATED for event in result.events
-            )
+            state_changed = bool(meaningful_events)
             should_state_snapshot = (
                 self.bar_count == 1
                 or self.bar_count % self.snapshot_interval_bars == 0
@@ -142,6 +172,8 @@ class SqliteReplayObserver(StrategyRunObserver):
                 cast(dict[str, JsonValue], account_payload),
             )
             self.snapshot_count += 1
+
+    def flush(self) -> None:
         self.connection.commit()
 
     def _raw(
@@ -343,6 +375,7 @@ class ReplayBundleBuilder:
             strategy_import_paths=(() if strategy_import_root is None else (strategy_import_root,)),
         )
         report = runner.run(max_close_batches)
+        observer.flush()
         start_time_ns = datetime_to_ns(run.start_time)
         self._ingest_strategy_outputs(connection, raw_output, start_time_ns)
         self._persist_entities(connection, runner)
@@ -494,6 +527,8 @@ class ReplayBundleBuilder:
                 source_sequence INTEGER NOT NULL,
                 payload TEXT NOT NULL
             );
+            CREATE INDEX raw_timeline_time_idx
+                ON raw_timeline(time_ns, priority, source_sequence, id);
             CREATE TABLE timeline(
                 sequence INTEGER PRIMARY KEY,
                 time_ns INTEGER NOT NULL,
@@ -646,16 +681,10 @@ class ReplayBundleBuilder:
 
     @staticmethod
     def _materialize_timeline(connection: sqlite3.Connection) -> None:
-        rows = connection.execute(
-            "SELECT time_ns, kind, payload FROM raw_timeline "
-            "ORDER BY time_ns, priority, source_sequence, id"
-        ).fetchall()
-        connection.executemany(
-            "INSERT INTO timeline(sequence, time_ns, kind, payload) VALUES (?, ?, ?, ?)",
-            (
-                (sequence, int(time_ns), str(kind), str(payload))
-                for sequence, (time_ns, kind, payload) in enumerate(rows, start=1)
-            ),
+        connection.execute(
+            "INSERT INTO timeline(sequence, time_ns, kind, payload) "
+            "SELECT ROW_NUMBER() OVER (ORDER BY time_ns, priority, source_sequence, id), "
+            "time_ns, kind, payload FROM raw_timeline"
         )
         connection.execute("DROP TABLE raw_timeline")
         connection.commit()

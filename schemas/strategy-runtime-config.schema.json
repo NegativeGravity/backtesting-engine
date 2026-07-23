@@ -26,8 +26,11 @@
       "type": "integer"
     },
     "isolation_mode": {
-      "const": "process",
       "default": "process",
+      "enum": [
+        "process",
+        "in_process"
+      ],
       "title": "Isolation Mode",
       "type": "string"
     },

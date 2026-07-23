@@ -38,6 +38,7 @@ from vex_strategy.exceptions import (
 )
 from vex_strategy.executor import StrategyActionExecutor
 from vex_strategy.forming import FormingBarCoordinator
+from vex_strategy.in_process import InProcessStrategyProcess
 from vex_strategy.isolation import IsolatedStrategyProcess
 from vex_strategy.observer import NullStrategyRunObserver, StrategyRunObserver
 from vex_strategy.output import StrategyOutputRecorder
@@ -158,7 +159,7 @@ class StrategyBacktestSession:
         self._end_time_ns = datetime_to_ns(run_config.end_time)
         self._last_time_ns = self._start_time_ns
         self._forming: FormingBarCoordinator | None = None
-        self._process: IsolatedStrategyProcess | None = None
+        self._process: IsolatedStrategyProcess | InProcessStrategyProcess | None = None
         self._batches: Iterator[BarCloseBatch] | None = None
         self._started = False
         self._finished = False
@@ -182,7 +183,10 @@ class StrategyBacktestSession:
         return self._last_time_ns
 
     def snapshot_report(self) -> StrategyBacktestReport:
-        return self._build_report()
+        return self._build_report(live=False)
+
+    def live_snapshot_report(self) -> StrategyBacktestReport:
+        return self._build_report(live=True)
 
     def start(self) -> StrategyStepResult:
         if self._started:
@@ -197,16 +201,19 @@ class StrategyBacktestSession:
         )
         self._warmup_forming(forming, self._start_time_ns)
         warmup = warmup.model_copy(update={"forming_bars": forming.snapshots(self._start_time_ns)})
-        process = IsolatedStrategyProcess(
-            WorkerStartRequest(
-                run_config=self.run_config,
-                descriptor=self.descriptor,
-                runtime_config=self.runtime_config,
-                initial_snapshot=self.broker.state_snapshot,
-                warmup=warmup,
-                start_time_ns=self._start_time_ns,
-                import_paths=self.strategy_import_paths,
-            )
+        start_request = WorkerStartRequest(
+            run_config=self.run_config,
+            descriptor=self.descriptor,
+            runtime_config=self.runtime_config,
+            initial_snapshot=self.broker.state_snapshot,
+            warmup=warmup,
+            start_time_ns=self._start_time_ns,
+            import_paths=self.strategy_import_paths,
+        )
+        process = (
+            InProcessStrategyProcess(start_request)
+            if self.runtime_config.isolation_mode == "in_process"
+            else IsolatedStrategyProcess(start_request)
         )
         subscriptions = tuple(
             (subscription.symbol, subscription.timeframe)
@@ -404,7 +411,7 @@ class StrategyBacktestSession:
 
     def _consume_with_feedback(
         self,
-        process: IsolatedStrategyProcess,
+        process: IsolatedStrategyProcess | InProcessStrategyProcess,
         output: StrategyOutputBatch,
         event_time_ns: int,
         forming_bars: tuple[FormingBar, ...],
@@ -505,8 +512,12 @@ class StrategyBacktestSession:
             for row in frame.iter_rows(named=True):
                 coordinator.ingest(bar_from_row(row))
 
-    def _build_report(self) -> StrategyBacktestReport:
-        broker_report = self.broker.build_report(self.counters.processed_execution_bars)
+    def _build_report(self, *, live: bool = False) -> StrategyBacktestReport:
+        broker_report = (
+            self.broker.build_live_report(self.counters.processed_execution_bars)
+            if live
+            else self.broker.build_report(self.counters.processed_execution_bars)
+        )
         output_digest = self.recorder.digest
         deterministic_digest = fingerprint(
             {
@@ -573,7 +584,7 @@ class StrategyBacktestSession:
         if self.store.report.dataset_version != self.run_config.dataset.version:
             raise StrategyProcessError("run dataset version does not match the import report")
 
-    def _require_process(self) -> IsolatedStrategyProcess:
+    def _require_process(self) -> IsolatedStrategyProcess | InProcessStrategyProcess:
         if self._process is None:
             raise StrategyProcessError("strategy process is not initialized")
         return self._process

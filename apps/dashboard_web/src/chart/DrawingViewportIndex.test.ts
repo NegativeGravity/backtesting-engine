@@ -25,7 +25,7 @@ describe("DrawingViewportIndex", () => {
       drawing("level", { kind: "horizontal_line", price_ticks: 1 })
     ]);
 
-    const result = index.query({ from: 0, to: 4 * HOUR_NS });
+    const result = index.query({ fromNs: 0, toNs: 4 * HOUR_NS });
     expect(result.drawings.map(item => item.drawingId)).toEqual(["day-1", "level"]);
     expect(result.totalCount).toBe(3);
   });
@@ -41,7 +41,7 @@ describe("DrawingViewportIndex", () => {
       })
     ]);
 
-    expect(index.query({ from: 100 * HOUR_NS, to: 101 * HOUR_NS }).drawings).toHaveLength(1);
+    expect(index.query({ fromNs: 100 * HOUR_NS, toNs: 101 * HOUR_NS }).drawings).toHaveLength(1);
   });
 
   it("extracts time bounds from YJ-style trend lines", () => {
@@ -61,7 +61,7 @@ it("caps global drawings before building the visible selection", () => {
     payload: { kind: "horizontal_line", price_ticks: value }
   })));
 
-  const result = index.query({ from: 0, to: 1 }, 100);
+  const result = index.query({ fromNs: 0, toNs: 1 }, 100);
 
   expect(result.drawings).toHaveLength(100);
   expect(result.drawings[0]?.drawingId).toBe("level-1900");
@@ -74,10 +74,11 @@ it("keeps open risk-reward drawings in the dynamic set", () => {
     revision: 1,
     payload: {
       kind: "risk_reward",
+      status: "open",
       entry_time_ns: 100,
       exit_time_ns: null
     }
   }]);
 
-  expect(index.query({ from: 10_000, to: 20_000 }).drawings[0]?.drawingId).toBe("open-risk");
+  expect(index.query({ fromNs: 10_000, toNs: 20_000 }).drawings[0]?.drawingId).toBe("open-risk");
 });

@@ -72,7 +72,7 @@
       "anyOf": [
         {
           "exclusiveMinimum": 0.0,
-          "maximum": 100000.0,
+          "maximum": 1000000.0,
           "type": "number"
         },
         {
@@ -103,6 +103,40 @@
     },
     "strategy_package_id": {
       "$ref": "#/$defs/Identifier"
+    },
+    "ui_snapshot_interval_ms": {
+      "default": 500,
+      "exclusiveMinimum": 0,
+      "maximum": 5000,
+      "minimum": 100,
+      "title": "Ui Snapshot Interval Ms",
+      "type": "integer"
+    },
+    "ui_timeline_limit": {
+      "default": 2000,
+      "exclusiveMinimum": 0,
+      "maximum": 20000,
+      "minimum": 100,
+      "title": "Ui Timeline Limit",
+      "type": "integer"
+    },
+    "ui_window_bars": {
+      "default": 2400,
+      "exclusiveMinimum": 0,
+      "maximum": 10000,
+      "minimum": 200,
+      "title": "Ui Window Bars",
+      "type": "integer"
+    },
+    "visualization_mode": {
+      "default": "auto",
+      "enum": [
+        "auto",
+        "replay",
+        "turbo"
+      ],
+      "title": "Visualization Mode",
+      "type": "string"
     }
   },
   "required": [

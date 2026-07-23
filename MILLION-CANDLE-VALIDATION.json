@@ -1,0 +1,37 @@
+{
+  "version": "1.5.0",
+  "validated_at": "2026-07-22",
+  "python_compileall": "passed",
+  "python_test_suites": [
+    {
+      "name": "broker-contract-hotpath",
+      "result": "passed",
+      "tests": 64
+    },
+    {
+      "name": "yj-strategy-and-advanced-orders",
+      "result": "passed",
+      "tests": 18
+    }
+  ],
+  "typescript_syntax": {
+    "result": "passed",
+    "files": 49,
+    "errors": 0
+  },
+  "hotpath_benchmark": {
+    "terminal_orders": 20000,
+    "strategy_snapshot_orders": 512,
+    "history_setup_seconds": 8.434686247999707,
+    "cached_snapshot_average_microseconds": 0.36716649992740713,
+    "live_report_average_microseconds": 107.38895750000665,
+    "event_tail": 3680
+  },
+  "not_executed_here": [
+    "npm ci",
+    "tsc -b",
+    "vite build",
+    "docker compose build"
+  ],
+  "note": "The final full TypeScript/Vite/Docker build must run on the target machine with npm dependencies and Docker available."
+}

@@ -41,7 +41,11 @@ class LiveRunCreateRequest(ContractModel):
     end_time: AwareDatetime | None = None
     max_close_batches: PositiveInt | None = None
     start_paused: bool = True
-    speed_bars_per_second: Decimal = Field(default=Decimal("10"), gt=0, le=100000)
+    speed_bars_per_second: Decimal = Field(default=Decimal("10"), gt=0, le=1000000)
+    visualization_mode: Literal["auto", "replay", "turbo"] = "auto"
+    ui_snapshot_interval_ms: PositiveInt = Field(default=500, ge=100, le=5000)
+    ui_window_bars: PositiveInt = Field(default=2400, ge=200, le=10000)
+    ui_timeline_limit: PositiveInt = Field(default=2000, ge=100, le=20000)
 
 
 class LiveRunControlCommand(ContractModel):
@@ -74,6 +78,7 @@ class LiveRunState(ContractModel):
     ]
     playing: bool
     speed_bars_per_second: Decimal = Field(gt=0)
+    visualization_mode: Literal["replay", "turbo"] = "replay"
     processed_close_batches: NonNegativeInt = 0
     processed_execution_bars: NonNegativeInt = 0
     current_time_ns: NonNegativeInt

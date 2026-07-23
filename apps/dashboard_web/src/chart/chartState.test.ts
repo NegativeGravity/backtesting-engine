@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyChartState, materializeChartState, pruneChartStateToWindow } from "./chartState";
+import { materializeChartState } from "./chartState";
 
 describe("materializeChartState", () => {
   it("creates series and points in timeline order", () => {
@@ -126,101 +126,44 @@ it("does not mark drawing-only frames as strategy-series updates", async () => {
   expect(summary.seriesPoints).toBe(0);
 });
 
-it("compacts indicator points in chunks instead of replacing the whole series every point", async () => {
-  const { applyChartCommand, emptyChartState } = await import("./chartState");
-  const { SERIES_POINT_HIGH_WATER, SERIES_POINT_TARGET } = await import("./performanceLimits");
+it("prunes points and drawings outside the active chart window", async () => {
+  const { emptyChartState, pruneChartStateToWindow } = await import("./chartState");
   const state = emptyChartState();
-  for (let timeNs = 1; timeNs <= SERIES_POINT_HIGH_WATER + 1; timeNs += 1) {
-    applyChartCommand(state, {
-      command_type: "append_series_point",
-      series_id: "close",
-      point: { point_type: "scalar", time_ns: timeNs, value: timeNs }
-    });
-  }
-  expect(state.points.get("close")).toHaveLength(SERIES_POINT_TARGET);
-  expect(state.points.get("close")?.[0]?.timeNs).toBe(
-    SERIES_POINT_HIGH_WATER - SERIES_POINT_TARGET + 2
-  );
-
-  applyChartCommand(state, {
-    command_type: "append_series_point",
-    series_id: "close",
-    point: {
-      point_type: "scalar",
-      time_ns: SERIES_POINT_HIGH_WATER + 2,
-      value: SERIES_POINT_HIGH_WATER + 2
-    }
-  });
-  expect(state.points.get("close")).toHaveLength(SERIES_POINT_TARGET + 1);
-});
-
-it("prunes indicator points and drawings outside the active chart window", async () => {
-  const {
-    emptyChartState,
-    pruneChartStateToWindow
-  } = await import("./chartState");
-  const state = emptyChartState();
-  state.points.set("close", [
-    { timeNs: 10, value: 1 },
-    { timeNs: 20, value: 2 },
-    { timeNs: 30, value: 3 },
-    { timeNs: 40, value: 4 }
+  state.points.set("study", [
+    { timeNs: 1, value: 1 },
+    { timeNs: 100, value: 2 },
+    { timeNs: 200, value: 3 }
   ]);
   state.drawings.set("old", {
     drawingId: "old",
     revision: 1,
     payload: {
+      drawing_id: "old",
       kind: "rectangle",
-      start: { time_ns: 1, price_ticks: 1 },
-      end: { time_ns: 5, price_ticks: 2 }
+      start: { time_ns: -100_000_000_000_000, price_ticks: 1 },
+      end: { time_ns: -99_000_000_000_000, price_ticks: 2 }
     }
   });
   state.drawings.set("visible", {
     drawingId: "visible",
     revision: 1,
     payload: {
+      drawing_id: "visible",
       kind: "rectangle",
-      start: { time_ns: 25, price_ticks: 1 },
-      end: { time_ns: 35, price_ticks: 2 }
-    }
-  });
-  state.drawings.set("open", {
-    drawingId: "open",
-    revision: 1,
-    payload: {
-      kind: "risk_reward",
-      entry_time_ns: 1,
-      exit_time_ns: null
+      start: { time_ns: 100, price_ticks: 1 },
+      end: { time_ns: 200, price_ticks: 2 }
     }
   });
 
-  const summary = pruneChartStateToWindow(state, 25, 40);
+  const summary = pruneChartStateToWindow(state, 100, 200);
 
-  expect(summary.drawingsRemoved).toBe(1);
+  expect(summary.seriesChanged).toBe(true);
+  expect(summary.drawingsChanged).toBe(true);
+  expect(state.points.get("study")).toEqual([
+    { timeNs: 1, value: 1 },
+    { timeNs: 100, value: 2 },
+    { timeNs: 200, value: 3 }
+  ]);
   expect(state.drawings.has("old")).toBe(false);
   expect(state.drawings.has("visible")).toBe(true);
-  expect(state.drawings.has("open")).toBe(true);
-  expect(state.points.get("close")).toEqual([
-    { timeNs: 20, value: 2 },
-    { timeNs: 30, value: 3 },
-    { timeNs: 40, value: 4 }
-  ]);
-});
-
-it("active replay pruning can preserve historical audit drawings", () => {
-  const state = emptyChartState();
-  state.drawings.set("yj.box.2025-01-03", {
-    drawingId: "yj.box.2025-01-03",
-    revision: 1,
-    payload: {
-      kind: "rectangle",
-      start: { time_ns: 1, price_ticks: 1 },
-      end: { time_ns: 2, price_ticks: 2 }
-    }
-  });
-
-  const summary = pruneChartStateToWindow(state, 100, 200, 0, false);
-
-  expect(summary.drawingsRemoved).toBe(0);
-  expect(state.drawings.has("yj.box.2025-01-03")).toBe(true);
 });

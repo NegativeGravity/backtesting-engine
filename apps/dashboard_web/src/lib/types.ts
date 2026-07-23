@@ -113,9 +113,6 @@ export interface PositionRecord {
   volume_lots: string;
   average_entry_price_ticks: string;
   opened_time_ns: number;
-  entry_order_id?: string | null;
-  entry_client_order_id?: string | null;
-  entry_tags?: Record<string, string>;
   current_price_ticks: number | null;
   stop_loss_ticks: number | null;
   take_profit_ticks: number | null;
@@ -146,9 +143,6 @@ export interface TradeRecord {
   exit_time_ns: number;
   entry_price_ticks: string;
   exit_price_ticks: string;
-  entry_order_id?: string | null;
-  entry_client_order_id?: string | null;
-  entry_tags?: Record<string, string>;
   stop_loss_ticks: number | null;
   take_profit_ticks: number | null;
   gross_pnl: string;
@@ -421,6 +415,7 @@ export interface LiveRunState {
   status: "created" | "starting" | "paused" | "running" | "rewinding" | "finalizing" | "completed" | "failed" | "cancelled";
   playing: boolean;
   speed_bars_per_second: string;
+  visualization_mode: "replay" | "turbo";
   processed_close_batches: number;
   processed_execution_bars: number;
   current_time_ns: number;
@@ -446,4 +441,8 @@ export interface LiveRunCreateRequest {
   max_close_batches?: number;
   start_paused?: boolean;
   speed_bars_per_second?: number;
+  visualization_mode?: "auto" | "replay" | "turbo";
+  ui_snapshot_interval_ms?: number;
+  ui_window_bars?: number;
+  ui_timeline_limit?: number;
 }

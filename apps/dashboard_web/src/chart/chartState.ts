@@ -1,9 +1,4 @@
 import type { ReplayTimelineItem } from "../lib/types";
-import {
-  MAX_ACTIVE_STRATEGY_DRAWINGS,
-  SERIES_POINT_HIGH_WATER,
-  SERIES_POINT_TARGET
-} from "./performanceLimits";
 
 export interface SeriesDefinition {
   seriesId: string;
@@ -31,12 +26,6 @@ export interface MaterializedChartState {
   drawings: Map<string, DrawingState>;
 }
 
-
-export interface ChartWindowPruneSummary {
-  pointsRemoved: number;
-  drawingsRemoved: number;
-}
-
 export interface ChartMutationSummary {
   chartCommands: number;
   seriesPoints: number;
@@ -44,6 +33,9 @@ export interface ChartMutationSummary {
   drawingsChanged: boolean;
 }
 
+const MAX_POINTS_PER_SERIES = 2_400;
+const MAX_ACTIVE_DRAWINGS = 4_000;
+const DRAWING_WINDOW_MARGIN_NS = 6 * 60 * 60 * 1_000_000_000;
 
 export function emptyChartState(): MaterializedChartState {
   return {
@@ -129,44 +121,65 @@ export function applyChartCommandsMutable(
   return summary;
 }
 
+
 export function pruneChartStateToWindow(
   state: MaterializedChartState,
-  fromTimeNs: number,
-  toTimeNs: number,
-  marginNs = 0,
-  pruneDrawings = true
-): ChartWindowPruneSummary {
-  if (!Number.isFinite(fromTimeNs) || !Number.isFinite(toTimeNs)) {
-    return { pointsRemoved: 0, drawingsRemoved: 0 };
+  startTimeNs: number,
+  endTimeNs: number
+): ChartMutationSummary {
+  const summary: ChartMutationSummary = {
+    chartCommands: 0,
+    seriesPoints: 0,
+    seriesChanged: false,
+    drawingsChanged: false
+  };
+  if (!Number.isFinite(startTimeNs) || !Number.isFinite(endTimeNs) || endTimeNs < startTimeNs) {
+    return summary;
   }
-
-  const boundedFrom = Math.min(fromTimeNs, toTimeNs) - Math.max(0, marginNs);
-  const boundedTo = Math.max(fromTimeNs, toTimeNs) + Math.max(0, marginNs);
-  let pointsRemoved = 0;
-  let drawingsRemoved = 0;
 
   for (const [seriesId, points] of state.points) {
-    if (points.length === 0) continue;
-    const firstInside = lowerBoundPoint(points, boundedFrom);
-    const keepFrom = Math.max(0, firstInside - 1);
-    const keepTo = upperBoundPoint(points, boundedTo);
-    if (keepFrom === 0 && keepTo === points.length) continue;
-    const next = points.slice(keepFrom, keepTo);
-    pointsRemoved += points.length - next.length;
-    state.points.set(seriesId, next);
-  }
-
-  if (pruneDrawings) {
-    for (const [drawingId, drawing] of state.drawings) {
-      const bounds = drawingTimeBounds(drawing.payload);
-      if (!bounds) continue;
-      if (bounds.to >= boundedFrom && bounds.from <= boundedTo) continue;
-      state.drawings.delete(drawingId);
-      drawingsRemoved += 1;
+    const firstVisible = lowerBoundPoint(points, startTimeNs);
+    const next = points.slice(Math.max(0, firstVisible - 1));
+    if (next.length !== points.length) {
+      state.points.set(seriesId, next);
+      summary.seriesPoints += next.length;
+      summary.seriesChanged = true;
     }
   }
 
-  return { pointsRemoved, drawingsRemoved };
+  const lower = startTimeNs - DRAWING_WINDOW_MARGIN_NS;
+  const upper = endTimeNs + DRAWING_WINDOW_MARGIN_NS;
+  for (const [drawingId, drawing] of state.drawings) {
+    const range = drawingTimeRange(drawing.payload);
+    if (range === null) continue;
+    if (range.toNs < lower || range.fromNs > upper) {
+      state.drawings.delete(drawingId);
+      summary.drawingsChanged = true;
+    }
+  }
+  return summary;
+}
+
+function drawingTimeRange(payload: Record<string, unknown>): { fromNs: number; toNs: number } | null {
+  const values: number[] = [];
+  collectTimeNs(payload, values);
+  if (values.length === 0) return null;
+  return { fromNs: Math.min(...values), toNs: Math.max(...values) };
+}
+
+function collectTimeNs(value: unknown, output: number[], depth = 0): void {
+  if (depth > 3 || value === null || typeof value !== "object") return;
+  if (Array.isArray(value)) {
+    for (const item of value) collectTimeNs(item, output, depth + 1);
+    return;
+  }
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    if ((key === "time_ns" || key.endsWith("_time_ns")) && typeof nested === "number" && Number.isFinite(nested)) {
+      output.push(nested);
+      continue;
+    }
+    if (typeof nested === "object") collectTimeNs(nested, output, depth + 1);
+  }
 }
 
 export function applyChartCommand(
@@ -229,8 +242,8 @@ function appendSeriesPointMutable(
     else points.splice(index, 0, { timeNs, value });
   }
 
-  if (points.length > SERIES_POINT_HIGH_WATER) {
-    points.splice(0, points.length - SERIES_POINT_TARGET);
+  if (points.length > MAX_POINTS_PER_SERIES) {
+    points.splice(0, points.length - MAX_POINTS_PER_SERIES);
   }
   state.points.set(seriesId, points);
   return true;
@@ -255,7 +268,7 @@ function upsertDrawingMutable(
 }
 
 function trimDrawings(state: MaterializedChartState): void {
-  const overflow = state.drawings.size - MAX_ACTIVE_STRATEGY_DRAWINGS;
+  const overflow = state.drawings.size - MAX_ACTIVE_DRAWINGS;
   if (overflow <= 0) return;
   let remaining = overflow;
   for (const drawingId of state.drawings.keys()) {
@@ -263,70 +276,6 @@ function trimDrawings(state: MaterializedChartState): void {
     remaining -= 1;
     if (remaining === 0) break;
   }
-}
-
-function drawingTimeBounds(
-  drawing: Record<string, unknown>
-): { from: number; to: number } | null {
-  const kind = String(drawing.kind ?? "");
-  if (kind === "horizontal_line") return null;
-  if (kind === "trend_line" || kind === "rectangle") {
-    return pointPairBounds(drawing.start, drawing.end);
-  }
-  if (kind === "marker") return singleTimeBounds(drawing.time_ns);
-  if (kind === "label") return pointTimeBounds(drawing.anchor);
-  if (kind === "risk_reward" || kind === "broker_trade") {
-    const entry = finiteTime(drawing.entry_time_ns);
-    if (entry === null) return null;
-    const exit = finiteTime(drawing.exit_time_ns);
-    if (exit === null) return null;
-    return normalizeBounds(entry, exit);
-  }
-  return singleTimeBounds(drawing.time_ns)
-    ?? pointPairBounds(drawing.start, drawing.end)
-    ?? pointTimeBounds(drawing.anchor);
-}
-
-function pointPairBounds(startValue: unknown, endValue: unknown): { from: number; to: number } | null {
-  const start = pointTime(startValue);
-  const end = pointTime(endValue);
-  return start === null || end === null ? null : normalizeBounds(start, end);
-}
-
-function pointTimeBounds(value: unknown): { from: number; to: number } | null {
-  const time = pointTime(value);
-  return time === null ? null : { from: time, to: time };
-}
-
-function pointTime(value: unknown): number | null {
-  if (!value || typeof value !== "object") return null;
-  return finiteTime((value as Record<string, unknown>).time_ns);
-}
-
-function singleTimeBounds(value: unknown): { from: number; to: number } | null {
-  const time = finiteTime(value);
-  return time === null ? null : { from: time, to: time };
-}
-
-function normalizeBounds(left: number, right: number): { from: number; to: number } {
-  return { from: Math.min(left, right), to: Math.max(left, right) };
-}
-
-function finiteTime(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function upperBoundPoint(points: ScalarPoint[], timeNs: number): number {
-  let low = 0;
-  let high = points.length;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    if ((points[middle]?.timeNs ?? Number.POSITIVE_INFINITY) <= timeNs) low = middle + 1;
-    else high = middle;
-  }
-  return low;
 }
 
 function lowerBoundPoint(points: ScalarPoint[], timeNs: number): number {

@@ -1,7 +1,7 @@
 name: vex-backtesting
 services:
   bootstrap:
-    image: vex-backtesting-engine:1.2.0
+    image: vex-backtesting-engine:1.5.0
     build:
       context: .
       dockerfile: Dockerfile
@@ -15,7 +15,7 @@ services:
     restart: "no"
 
   engine:
-    image: vex-backtesting-engine:1.2.0
+    image: vex-backtesting-engine:1.5.0
     command:
       - vex-engine
       - --project-root
@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
 
   dashboard:
-    image: vex-backtesting-engine:1.2.0
+    image: vex-backtesting-engine:1.5.0
     command:
       - vex-dashboard
       - --project-root
@@ -76,37 +76,3 @@ services:
       retries: 18
       start_period: 10s
     restart: unless-stopped
-
-  postgres:
-    image: public.ecr.aws/docker/library/postgres:17-alpine
-    profiles: ["infra"]
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-vex}
-      POSTGRES_USER: ${POSTGRES_USER:-vex}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vex}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vex} -d ${POSTGRES_DB:-vex}"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: public.ecr.aws/docker/library/redis:7.4-alpine
-    profiles: ["infra"]
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    volumes:
-      - redis_data:/data
-
-volumes:
-  postgres_data:
-  redis_data:

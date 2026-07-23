@@ -1,4 +1,5 @@
-from collections import defaultdict
+import hashlib
+from collections import defaultdict, deque
 from collections.abc import Iterable
 from decimal import ROUND_HALF_UP, Decimal
 from typing import cast
@@ -36,7 +37,13 @@ from vex_broker.exceptions import (
     PositionNotFoundError,
 )
 from vex_broker.ids import DeterministicIdGenerator
-from vex_broker.models import AccountState, BrokerResult, BrokerState, PositionState
+from vex_broker.models import (
+    AccountState,
+    BrokerAggregateStatistics,
+    BrokerResult,
+    BrokerState,
+    PositionState,
+)
 from vex_broker.pricing import PriceResolver, ResolvedBar
 from vex_broker.sizing import PositionSizer
 from vex_contracts.broker import BrokerSimulationReport, BrokerStateSnapshot
@@ -63,7 +70,7 @@ from vex_contracts.orders import (
 )
 from vex_contracts.positions import AccountSnapshot, Position, Trade
 from vex_contracts.run import BacktestRunConfig
-from vex_contracts.serialization import fingerprint
+from vex_contracts.serialization import canonical_json, fingerprint
 from vex_contracts.symbol import SymbolProfile
 
 ZERO = Decimal("0")
@@ -101,6 +108,29 @@ class BrokerSimulator:
         }
         self._client_order_ids: set[str] = set()
         self._last_resolved: dict[str, ResolvedBar] = {}
+        self._active_order_ids: set[str] = set()
+        self._recent_terminal_order_ids: deque[str] = deque()
+        self._recent_terminal_order_id_set: set[str] = set()
+        self._strategy_terminal_order_limit = 512
+        self._rejected_order_ids: set[str] = set()
+        self._cancelled_order_ids: set[str] = set()
+        self._commission_total = ZERO
+        self._spread_total = ZERO
+        self._slippage_total = ZERO
+        self._realized_swap_total = ZERO
+        self._gross_profit_total = ZERO
+        self._gross_loss_total = ZERO
+        self._realized_r_sum = ZERO
+        self._realized_r_count = 0
+        self._winning_trades = 0
+        self._losing_trades = 0
+        self._long_trades = 0
+        self._short_trades = 0
+        self._max_drawdown_amount = ZERO
+        self._max_drawdown_percent = ZERO
+        self._event_digest = hashlib.sha256()
+        self._state_snapshot_cache: BrokerStateSnapshot | None = None
+        self._state_snapshot_cache_key: tuple[object, ...] | None = None
 
     @property
     def open_positions(self) -> tuple[Position, ...]:
@@ -121,59 +151,139 @@ class BrokerSimulator:
     def fills(self) -> tuple[Fill, ...]:
         return tuple(self.state.fills)
 
+    def recent_orders(self, limit: int) -> tuple[Order, ...]:
+        if limit <= 0:
+            return ()
+        values = tuple(self.state.orders.values())
+        return values[-limit:]
+
+    def recent_fills(self, limit: int) -> tuple[Fill, ...]:
+        if limit <= 0:
+            return ()
+        return tuple(self.state.fills[-limit:])
+
+    def recent_trades(self, limit: int) -> tuple[Trade, ...]:
+        if limit <= 0:
+            return ()
+        return tuple(self.state.trades[-limit:])
+
     @property
     def account_snapshot(self) -> AccountSnapshot:
         return self._snapshot(self.state.current_time_ns)
 
     @property
     def state_snapshot(self) -> BrokerStateSnapshot:
-        return BrokerStateSnapshot(
+        account = self.state.account
+        cache_key: tuple[object, ...] = (
+            self.state.current_time_ns,
+            self._events.sequence,
+            len(self._active_order_ids),
+            len(self._recent_terminal_order_ids),
+            len(self.state.positions),
+            account.balance,
+            account.equity,
+            account.margin,
+            account.floating_pnl,
+        )
+        if self._state_snapshot_cache_key == cache_key and self._state_snapshot_cache is not None:
+            return self._state_snapshot_cache
+        snapshot = BrokerStateSnapshot(
             run_id=self.run_config.run_id,
             timestamp_ns=self.state.current_time_ns,
             event_sequence=self._events.sequence,
             account=self.account_snapshot,
-            orders=self.orders,
+            orders=self._strategy_snapshot_orders(),
             positions=self.open_positions,
         )
+        self._state_snapshot_cache_key = cache_key
+        self._state_snapshot_cache = snapshot
+        return snapshot
+
+    @property
+    def max_drawdown_amount(self) -> Decimal:
+        return self._max_drawdown_amount
+
+    @property
+    def max_drawdown_percent(self) -> Decimal:
+        return self._max_drawdown_percent
+
+    @property
+    def aggregate_statistics(self) -> BrokerAggregateStatistics:
+        return BrokerAggregateStatistics(
+            commission=self._commission_total,
+            spread_cost=self._spread_total,
+            slippage_cost=self._slippage_total,
+            realized_swap=self._realized_swap_total,
+            gross_profit=self._gross_profit_total,
+            gross_loss=self._gross_loss_total,
+            realized_r_sum=self._realized_r_sum,
+            realized_r_count=self._realized_r_count,
+            trade_count=len(self.state.trades),
+            winning_trades=self._winning_trades,
+            losing_trades=self._losing_trades,
+            long_trades=self._long_trades,
+            short_trades=self._short_trades,
+            rejected_orders=len(self._rejected_order_ids),
+            cancelled_orders=len(self._cancelled_order_ids),
+        )
+
+    def build_live_report(self, processed_bars: int) -> BrokerSimulationReport:
+        return self._build_report(processed_bars, include_history=False)
 
     def build_report(self, processed_bars: int) -> BrokerSimulationReport:
-        commission = sum((fill.commission for fill in self.state.fills), start=ZERO)
-        spread = sum((fill.spread_cost for fill in self.state.fills), start=ZERO)
-        slippage = sum((fill.slippage_cost for fill in self.state.fills), start=ZERO)
-        realized_swap = sum((trade.swap for trade in self.state.trades), start=ZERO)
+        return self._build_report(processed_bars, include_history=True)
+
+    def _build_report(
+        self,
+        processed_bars: int,
+        *,
+        include_history: bool,
+    ) -> BrokerSimulationReport:
         open_swap = sum((position.swap for position in self.state.positions.values()), start=ZERO)
-        swap = realized_swap + open_swap
+        swap = self._realized_swap_total + open_swap
         net_pnl = self.state.account.equity - self.run_config.account.initial_balance
-        gross_pnl = net_pnl + commission + spread + slippage - swap
-        digest = fingerprint(
-            {
-                "run_id": self.run_config.run_id,
-                "events": self.state.events,
-                "orders": self.orders,
-                "fills": self.fills,
-                "trades": self.trades,
-                "account": self.account_snapshot,
-            }
+        gross_pnl = (
+            net_pnl
+            + self._commission_total
+            + self._spread_total
+            + self._slippage_total
+            - swap
         )
-        rejected = sum(order.status is OrderStatus.REJECTED for order in self.orders)
-        cancelled = sum(order.status is OrderStatus.CANCELLED for order in self.orders)
+        digest_payload: dict[str, object] = {
+            "run_id": self.run_config.run_id,
+            "event_digest": self._event_digest.hexdigest(),
+            "event_count": self._events.sequence,
+            "order_count": len(self.state.orders),
+            "fill_count": len(self.state.fills),
+            "trade_count": len(self.state.trades),
+            "account": self.account_snapshot,
+        }
+        if include_history:
+            digest_payload.update(
+                {
+                    "orders": self.orders,
+                    "fills": self.fills,
+                    "trades": self.trades,
+                }
+            )
+        digest = fingerprint(digest_payload)
         return BrokerSimulationReport(
             report_id=f"broker_report_{digest[:24]}",
             run_id=self.run_config.run_id,
             processed_bars=processed_bars,
             event_count=self._events.sequence,
-            order_count=len(self.orders),
-            fill_count=len(self.fills),
-            trade_count=len(self.trades),
-            open_position_count=len(self.open_positions),
-            rejected_order_count=rejected,
-            cancelled_order_count=cancelled,
+            order_count=len(self.state.orders),
+            fill_count=len(self.state.fills),
+            trade_count=len(self.state.trades),
+            open_position_count=len(self.state.positions),
+            rejected_order_count=len(self._rejected_order_ids),
+            cancelled_order_count=len(self._cancelled_order_ids),
             final_account=self.account_snapshot,
             gross_pnl=gross_pnl,
             net_pnl=net_pnl,
-            commission=commission,
-            spread_cost=spread,
-            slippage_cost=slippage,
+            commission=self._commission_total,
+            spread_cost=self._spread_total,
+            slippage_cost=self._slippage_total,
             swap=swap,
             deterministic_digest=digest,
         )
@@ -197,7 +307,7 @@ class BrokerSimulator:
     def submit_order(self, request: OrderRequest) -> BrokerResult:
         events: list[EventEnvelope[dict[str, JsonValue]]] = []
         order = Order(order_id=self._ids.next("ord"), request=request)
-        self.state.orders[order.order_id] = order
+        self._store_order(order)
         events.append(self._emit(EventType.ORDER_CREATED, request.created_time_ns, order))
         reason = self._submission_rejection_reason(request)
         if reason is not None:
@@ -207,11 +317,11 @@ class BrokerSimulator:
                 request.created_time_ns,
                 rejection_reason=reason,
             )
-            self.state.orders[order.order_id] = rejected
+            self._store_order(rejected)
             events.append(self._emit(EventType.ORDER_REJECTED, request.created_time_ns, rejected))
             return self._result(events=events)
         accepted = transition_order(order, OrderStatus.ACCEPTED, request.created_time_ns)
-        self.state.orders[order.order_id] = accepted
+        self._store_order(accepted)
         self._client_order_ids.add(request.client_order_id)
         events.append(self._emit(EventType.ORDER_ACCEPTED, request.created_time_ns, accepted))
         return self._result(events=events)
@@ -223,7 +333,7 @@ class BrokerSimulator:
         if "broker_protection" in order.request.tags or "broker_exit" in order.request.tags:
             raise OrderRejectedError("broker-owned orders cannot be cancelled directly")
         cancelled = transition_order(order, OrderStatus.CANCELLED, request.requested_time_ns)
-        self.state.orders[order.order_id] = cancelled
+        self._store_order(cancelled)
         event = self._emit(
             EventType.ORDER_CANCELLED,
             request.requested_time_ns,
@@ -264,7 +374,7 @@ class BrokerSimulator:
                 "revision": order.revision + 1,
             }
         )
-        self.state.orders[order.order_id] = modified
+        self._store_order(modified)
         event = self._emit(EventType.ORDER_MODIFIED, request.requested_time_ns, modified)
         return self._result(events=[event])
 
@@ -349,9 +459,9 @@ class BrokerSimulator:
                 slippage_cost=slippage,
             )
             filled_order = apply_fill(exit_order, fill)
-            self.state.orders[filled_order.order_id] = filled_order
+            self._store_order(filled_order)
             self.state.account.balance -= commission
-            self.state.fills.append(fill)
+            self._append_fill(fill)
             fills.append(fill)
             events.append(
                 self._emit(
@@ -566,7 +676,7 @@ class BrokerSimulator:
             if expiration is None or expiration > bar.open_time_ns:
                 continue
             expired = transition_order(order, OrderStatus.EXPIRED, bar.open_time_ns)
-            self.state.orders[order.order_id] = expired
+            self._store_order(expired)
             events.append(self._emit(EventType.ORDER_EXPIRED, bar.open_time_ns, expired))
 
     def _activate_orders(
@@ -580,7 +690,7 @@ class BrokerSimulator:
             if bar.open_time_ns < order.request.created_time_ns:
                 continue
             active = transition_order(order, OrderStatus.ACTIVE, bar.open_time_ns)
-            self.state.orders[order.order_id] = active
+            self._store_order(active)
             events.append(self._emit(EventType.ORDER_ACTIVATED, bar.open_time_ns, active))
 
     def _active_orders(self, symbol: str) -> tuple[Order, ...]:
@@ -718,7 +828,7 @@ class BrokerSimulator:
         if current is None or current.status not in {OrderStatus.ACCEPTED, OrderStatus.ACTIVE}:
             return
         cancelled = transition_order(current, OrderStatus.CANCELLED, time_ns)
-        self.state.orders[current.order_id] = cancelled
+        self._store_order(cancelled)
         events.append(
             self._emit(
                 EventType.ORDER_CANCELLED,
@@ -819,7 +929,7 @@ class BrokerSimulator:
                 time_ns,
                 rejection_reason=str(exc),
             )
-            self.state.orders[order.order_id] = rejected
+            self._store_order(rejected)
             events.append(self._emit(EventType.ORDER_REJECTED, time_ns, rejected))
             return ()
         commission = commission_cost(
@@ -853,8 +963,8 @@ class BrokerSimulator:
             slippage_cost=slippage,
         )
         filled = apply_fill(prepared_order, fill)
-        self.state.orders[order.order_id] = filled
-        self.state.fills.append(fill)
+        self._store_order(filled)
+        self._append_fill(fill)
         fills.append(fill)
         self.state.account.balance -= commission
         events.append(
@@ -895,14 +1005,9 @@ class BrokerSimulator:
             if request.side is Side.BUY
             else entry_ticks - target_distance
         )
-        sizing_capital = (
-            self.state.account.balance
-            if instruction.account_basis == "balance"
-            else self.state.account.equity
-        )
         volume = PositionSizer.size(
             self.run_config.risk.default_sizing,
-            sizing_capital,
+            self.state.account.equity,
             entry_ticks,
             stop_ticks,
             self.symbol_profiles[request.symbol],
@@ -924,7 +1029,7 @@ class BrokerSimulator:
                 "revision": order.revision + 1,
             }
         )
-        self.state.orders[order.order_id] = modified
+        self._store_order(modified)
         events.append(
             self._emit(
                 EventType.ORDER_MODIFIED,
@@ -1165,8 +1270,6 @@ class BrokerSimulator:
             average_entry_price_ticks=Decimal(price_ticks),
             opened_time_ns=cast(int, order.terminal_time_ns),
             entry_order_id=order.order_id,
-            entry_client_order_id=request.client_order_id,
-            entry_tags=dict(request.tags),
             stop_loss_ticks=request.stop_loss_ticks,
             take_profit_ticks=request.take_profit_ticks,
             entry_commission=commission,
@@ -1264,7 +1367,7 @@ class BrokerSimulator:
         created = Order(order_id=self._ids.next("ord"), request=request)
         accepted = transition_order(created, OrderStatus.ACCEPTED, time_ns)
         active = transition_order(accepted, OrderStatus.ACTIVE, time_ns)
-        self.state.orders[active.order_id] = active
+        self._store_order(active)
         self._client_order_ids.add(request.client_order_id)
         events.append(self._emit(EventType.ORDER_CREATED, time_ns, created))
         events.append(self._emit(EventType.ORDER_ACCEPTED, time_ns, accepted))
@@ -1295,7 +1398,7 @@ class BrokerSimulator:
         created = Order(order_id=self._ids.next("ord"), request=request)
         accepted = transition_order(created, OrderStatus.ACCEPTED, time_ns)
         active = transition_order(accepted, OrderStatus.ACTIVE, time_ns)
-        self.state.orders[active.order_id] = active
+        self._store_order(active)
         self._client_order_ids.add(request.client_order_id)
         events.append(self._emit(EventType.ORDER_CREATED, time_ns, created))
         events.append(self._emit(EventType.ORDER_ACCEPTED, time_ns, accepted))
@@ -1315,7 +1418,7 @@ class BrokerSimulator:
         if order is None or order.status not in {OrderStatus.ACCEPTED, OrderStatus.ACTIVE}:
             return
         cancelled = transition_order(order, OrderStatus.CANCELLED, time_ns)
-        self.state.orders[order_id] = cancelled
+        self._store_order(cancelled)
         events.append(
             self._emit(
                 EventType.ORDER_CANCELLED,
@@ -1393,8 +1496,8 @@ class BrokerSimulator:
                 slippage_cost=slippage,
             )
             filled_order = apply_fill(protection_order, fill)
-            self.state.orders[filled_order.order_id] = filled_order
-            self.state.fills.append(fill)
+            self._store_order(filled_order)
+            self._append_fill(fill)
             fills.append(fill)
             self.state.account.balance -= commission
             events.append(
@@ -1434,8 +1537,6 @@ class BrokerSimulator:
                     reversal.reverse_stop_ticks,
                     reversal.reward_risk,
                     reversal.chain_id,
-                    reversal.account_basis,
-                    entry_order.request.tags,
                     resolved,
                     bar.close_time_ns,
                     fills,
@@ -1453,8 +1554,6 @@ class BrokerSimulator:
         reverse_stop_ticks: int,
         reward_risk: Decimal,
         chain_id: str | None,
-        account_basis: str,
-        source_tags: dict[str, str],
         resolved: ResolvedBar,
         time_ns: int,
         fills: list[Fill],
@@ -1482,14 +1581,9 @@ class BrokerSimulator:
         )
         profile = self.symbol_profiles[closed_position.symbol]
         try:
-            sizing_capital = (
-                self.state.account.balance
-                if account_basis == "balance"
-                else self.state.account.equity
-            )
             volume = PositionSizer.size(
                 self.run_config.risk.default_sizing,
-                sizing_capital,
+                self.state.account.equity,
                 entry_ticks,
                 reverse_stop_ticks,
                 profile,
@@ -1498,20 +1592,11 @@ class BrokerSimulator:
         except OrderRejectedError:
             return ()
         tags = {
-            key: value
-            for key, value in source_tags.items()
-            if key in {"strategy", "chain_id", "trade_date"}
+            "broker_generated": "stop_and_reverse",
+            "leg": "2",
         }
-        tags.update(
-            {
-                "broker_generated": "stop_and_reverse",
-                "leg": "2",
-                "direction": "long" if reverse_side is Side.BUY else "short",
-            }
-        )
         if chain_id is not None:
             tags[STOP_AND_REVERSE_CHAIN_ID_TAG] = chain_id
-            tags["chain_id"] = chain_id
         request = OrderRequest(
             client_order_id=self._ids.next("stop_and_reverse_client"),
             run_id=closed_position.run_id,
@@ -1526,7 +1611,7 @@ class BrokerSimulator:
             tags=tags,
         )
         created = Order(order_id=self._ids.next("ord"), request=request)
-        self.state.orders[created.order_id] = created
+        self._store_order(created)
         events.append(self._emit(EventType.ORDER_CREATED, time_ns, created))
         reason = self._submission_rejection_reason(request)
         if reason is not None:
@@ -1536,12 +1621,12 @@ class BrokerSimulator:
                 time_ns,
                 rejection_reason=reason,
             )
-            self.state.orders[rejected.order_id] = rejected
+            self._store_order(rejected)
             events.append(self._emit(EventType.ORDER_REJECTED, time_ns, rejected))
             return ()
         accepted = transition_order(created, OrderStatus.ACCEPTED, time_ns)
         active = transition_order(accepted, OrderStatus.ACTIVE, time_ns)
-        self.state.orders[active.order_id] = active
+        self._store_order(active)
         self._client_order_ids.add(request.client_order_id)
         events.append(self._emit(EventType.ORDER_ACCEPTED, time_ns, accepted))
         events.append(self._emit(EventType.ORDER_ACTIVATED, time_ns, active))
@@ -1563,7 +1648,7 @@ class BrokerSimulator:
                 time_ns,
                 rejection_reason=str(exc),
             )
-            self.state.orders[rejected.order_id] = rejected
+            self._store_order(rejected)
             events.append(self._emit(EventType.ORDER_REJECTED, time_ns, rejected))
             return ()
         commission = commission_cost(
@@ -1589,8 +1674,8 @@ class BrokerSimulator:
             slippage_cost=slippage,
         )
         filled = apply_fill(active, fill)
-        self.state.orders[filled.order_id] = filled
-        self.state.fills.append(fill)
+        self._store_order(filled)
+        self._append_fill(fill)
         fills.append(fill)
         self.state.account.balance -= commission
         events.append(
@@ -1795,9 +1880,6 @@ class BrokerSimulator:
             exit_time_ns=time_ns,
             entry_price_ticks=position.average_entry_price_ticks,
             exit_price_ticks=Decimal(exit_price_ticks),
-            entry_order_id=position.entry_order_id,
-            entry_client_order_id=position.entry_client_order_id,
-            entry_tags=dict(position.entry_tags),
             stop_loss_ticks=position.stop_loss_ticks,
             take_profit_ticks=position.take_profit_ticks,
             gross_pnl=gross_pnl,
@@ -1823,9 +1905,6 @@ class BrokerSimulator:
             volume_lots=volume,
             average_entry_price_ticks=position.average_entry_price_ticks,
             opened_time_ns=position.opened_time_ns,
-            entry_order_id=position.entry_order_id,
-            entry_client_order_id=position.entry_client_order_id,
-            entry_tags=dict(position.entry_tags),
             current_price_ticks=exit_price_ticks,
             stop_loss_ticks=position.stop_loss_ticks,
             take_profit_ticks=position.take_profit_ticks,
@@ -1838,7 +1917,7 @@ class BrokerSimulator:
             swap=swap,
         )
         self.state.account.balance += actual_pnl + swap
-        self.state.trades.append(trade)
+        self._append_trade(trade)
         trades.append(trade)
         position.volume_lots -= volume
         position.entry_commission -= entry_commission
@@ -1969,6 +2048,14 @@ class BrokerSimulator:
             if account.peak_equity > 0
             else ZERO
         )
+        self._max_drawdown_amount = max(
+            self._max_drawdown_amount,
+            account.drawdown_amount,
+        )
+        self._max_drawdown_percent = max(
+            self._max_drawdown_percent,
+            account.drawdown_percent,
+        )
 
     def _process_margin_state(
         self,
@@ -2050,9 +2137,9 @@ class BrokerSimulator:
                 slippage_cost=slippage,
             )
             filled_order = apply_fill(exit_order, fill)
-            self.state.orders[filled_order.order_id] = filled_order
+            self._store_order(filled_order)
             self.state.account.balance -= commission
-            self.state.fills.append(fill)
+            self._append_fill(fill)
             fills.append(fill)
             events.append(
                 self._emit(
@@ -2150,9 +2237,6 @@ class BrokerSimulator:
             volume_lots=state.volume_lots,
             average_entry_price_ticks=state.average_entry_price_ticks,
             opened_time_ns=state.opened_time_ns,
-            entry_order_id=state.entry_order_id,
-            entry_client_order_id=state.entry_client_order_id,
-            entry_tags=dict(state.entry_tags),
             current_price_ticks=state.current_price_ticks,
             stop_loss_ticks=state.stop_loss_ticks,
             take_profit_ticks=state.take_profit_ticks,
@@ -2209,8 +2293,66 @@ class BrokerSimulator:
             strategy_instance_id=strategy_instance_id,
             symbol=symbol,
         )
+        encoded = canonical_json(event).encode("utf-8")
+        self._event_digest.update(len(encoded).to_bytes(8, "big"))
+        self._event_digest.update(encoded)
         self.state.events.append(event)
+        if len(self.state.events) > 4_096:
+            del self.state.events[:1_024]
         return event
+
+    def _store_order(self, order: Order) -> None:
+        self.state.orders[order.order_id] = order
+        if order.terminal_time_ns is None:
+            self._active_order_ids.add(order.order_id)
+            return
+        self._active_order_ids.discard(order.order_id)
+        if order.order_id not in self._recent_terminal_order_id_set:
+            self._recent_terminal_order_ids.append(order.order_id)
+            self._recent_terminal_order_id_set.add(order.order_id)
+            while len(self._recent_terminal_order_ids) > self._strategy_terminal_order_limit:
+                expired_id = self._recent_terminal_order_ids.popleft()
+                self._recent_terminal_order_id_set.discard(expired_id)
+        if order.status is OrderStatus.REJECTED:
+            self._rejected_order_ids.add(order.order_id)
+        if order.status is OrderStatus.CANCELLED:
+            self._cancelled_order_ids.add(order.order_id)
+
+    def _strategy_snapshot_orders(self) -> tuple[Order, ...]:
+        active = tuple(
+            self.state.orders[order_id]
+            for order_id in sorted(self._active_order_ids)
+            if order_id in self.state.orders
+        )
+        recent = tuple(
+            self.state.orders[order_id]
+            for order_id in self._recent_terminal_order_ids
+            if order_id in self.state.orders and order_id not in self._active_order_ids
+        )
+        return active + recent
+
+    def _append_fill(self, fill: Fill) -> None:
+        self.state.fills.append(fill)
+        self._commission_total += fill.commission
+        self._spread_total += fill.spread_cost
+        self._slippage_total += fill.slippage_cost
+
+    def _append_trade(self, trade: Trade) -> None:
+        self.state.trades.append(trade)
+        self._realized_swap_total += trade.swap
+        if trade.net_pnl > 0:
+            self._winning_trades += 1
+            self._gross_profit_total += trade.net_pnl
+        elif trade.net_pnl < 0:
+            self._losing_trades += 1
+            self._gross_loss_total += -trade.net_pnl
+        if trade.side is PositionSide.LONG:
+            self._long_trades += 1
+        else:
+            self._short_trades += 1
+        if trade.realized_r_multiple is not None:
+            self._realized_r_sum += trade.realized_r_multiple
+            self._realized_r_count += 1
 
     @staticmethod
     def _json(model: BaseModel) -> dict[str, JsonValue]:

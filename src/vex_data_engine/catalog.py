@@ -123,6 +123,11 @@ class ParquetBarStore:
         start_time_ns: int | None = None,
         end_time_ns: int | None = None,
     ) -> Iterator[BarCloseBatch]:
+        if len(subscriptions) == 1:
+            symbol, timeframe = subscriptions[0]
+            for row in self._iter_cached_rows(symbol, timeframe, start_time_ns, end_time_ns):
+                yield BarCloseBatch(close_time_ns=_as_int(row["close_time_ns"]), bars=(row,))
+            return
         streams = tuple(
             self._iter_cached_rows(symbol, timeframe, start_time_ns, end_time_ns)
             for symbol, timeframe in subscriptions
@@ -173,8 +178,27 @@ class ParquetBarStore:
         path = self.project_root / artifact.relative_path
         if not path.exists():
             raise CacheMissError(f"cache artifact does not exist: {path}")
-        parquet = pq.ParquetFile(path)
-        for batch in parquet.iter_batches(batch_size=4_096):
+        parquet = pq.ParquetFile(path, memory_map=True)
+        columns = (
+            "symbol",
+            "timeframe",
+            "open_time_ns",
+            "close_time_ns",
+            "open_ticks",
+            "high_ticks",
+            "low_ticks",
+            "close_ticks",
+            "tick_volume",
+            "real_volume",
+            "source_spread_points",
+            "sequence",
+            "is_complete",
+        )
+        for batch in parquet.iter_batches(
+            batch_size=65_536,
+            columns=columns,
+            use_threads=True,
+        ):
             rows = cast(list[dict[str, Any]], batch.to_pylist())
             for raw in rows:
                 row = cast(dict[str, object], raw)

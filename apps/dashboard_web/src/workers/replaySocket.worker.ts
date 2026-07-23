@@ -9,8 +9,8 @@ interface WorkerScope {
 }
 
 const scope = globalThis as unknown as WorkerScope;
-const MAX_PENDING_TIMELINE_ITEMS = 20_000;
-const MAX_PENDING_BARS = 12_000;
+const MAX_PENDING_TIMELINE_ITEMS = 2_000;
+const MAX_PENDING_BARS = 2_400;
 
 let socket: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -114,17 +114,16 @@ function ingest(message: SocketMessage): void {
     stats.receivedFrames += 1;
     pendingFrameCount += 1;
     pendingFrame = pendingFrame
-      ? mergeAdvanceFramesFast(pendingFrame, message.data)
-      : message.data;
+      ? mergeAdvanceFramesFast(pendingFrame, message.data, {
+          maxBars: MAX_PENDING_BARS,
+          maxTimelineItems: MAX_PENDING_TIMELINE_ITEMS
+        })
+      : {
+          ...message.data,
+          bars: message.data.bars.slice(-MAX_PENDING_BARS),
+          timeline: message.data.timeline.slice(-MAX_PENDING_TIMELINE_ITEMS)
+        };
     stats.pendingFrames = pendingFrameCount;
-
-    if (
-      pendingFrame.timeline.length >= MAX_PENDING_TIMELINE_ITEMS ||
-      pendingFrame.bars.length >= MAX_PENDING_BARS
-    ) {
-      requestResync();
-      return;
-    }
 
     scheduleFlush();
     emitStatsSoon();

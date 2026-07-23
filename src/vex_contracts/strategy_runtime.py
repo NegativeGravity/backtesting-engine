@@ -15,7 +15,7 @@ from vex_contracts.version import CONTRACT_SCHEMA_VERSION, SchemaVersion
 
 class StrategyRuntimeConfig(ContractModel):
     schema_version: SchemaVersion = CONTRACT_SCHEMA_VERSION
-    isolation_mode: Literal["process"] = "process"
+    isolation_mode: Literal["process", "in_process"] = "process"
     startup_timeout_seconds: float = Field(default=10.0, gt=0, le=300)
     callback_timeout_seconds: float = Field(default=5.0, gt=0, le=300)
     shutdown_timeout_seconds: float = Field(default=5.0, gt=0, le=300)

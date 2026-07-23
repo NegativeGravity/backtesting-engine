@@ -15,10 +15,8 @@ STOP_AND_REVERSE_ENABLED_TAG = "vex.stop_and_reverse.enabled"
 STOP_AND_REVERSE_STOP_TICKS_TAG = "vex.stop_and_reverse.stop_ticks"
 STOP_AND_REVERSE_REWARD_RISK_TAG = "vex.stop_and_reverse.reward_risk"
 STOP_AND_REVERSE_CHAIN_ID_TAG = "vex.stop_and_reverse.chain_id"
-STOP_AND_REVERSE_ACCOUNT_BASIS_TAG = "vex.stop_and_reverse.account_basis"
 EXECUTION_RISK_REWARD_ENABLED_TAG = "vex.execution_risk_reward.enabled"
 EXECUTION_REWARD_RISK_TAG = "vex.execution_risk_reward.ratio"
-EXECUTION_ACCOUNT_BASIS_TAG = "vex.execution_risk_reward.account_basis"
 ENTRY_REQUIRE_FLAT_TAG = "vex.entry.require_flat"
 ENTRY_REEVALUATE_AFTER_FLAT_TAG = "vex.entry.reevaluate_after_flat"
 INTRABAR_ENTRY_TARGET_ALLOWED_TAG = "vex.intrabar_entry.target_allowed"
@@ -27,7 +25,6 @@ INTRABAR_ENTRY_TARGET_ALLOWED_TAG = "vex.intrabar_entry.target_allowed"
 @dataclass(frozen=True, slots=True)
 class ExecutionRiskRewardInstruction:
     reward_risk: Decimal
-    account_basis: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,7 +32,6 @@ class StopAndReverseInstruction:
     reverse_stop_ticks: int
     reward_risk: Decimal
     chain_id: str | None
-    account_basis: str
 
 
 def oco_group(order: Order) -> str | None:
@@ -81,13 +77,7 @@ def execution_risk_reward_instruction(
         raise ValueError("execution risk/reward is not valid on reduce-only orders")
     if request.stop_loss_ticks is None:
         raise ValueError("execution risk/reward requires a stop loss")
-    account_basis = request.tags.get(EXECUTION_ACCOUNT_BASIS_TAG, "equity").lower()
-    if account_basis not in {"balance", "equity"}:
-        raise ValueError("execution risk/reward account basis must be balance or equity")
-    return ExecutionRiskRewardInstruction(
-        reward_risk=reward_risk,
-        account_basis=account_basis,
-    )
+    return ExecutionRiskRewardInstruction(reward_risk=reward_risk)
 
 
 def stop_and_reverse_instruction(
@@ -118,14 +108,10 @@ def stop_and_reverse_instruction(
     if request.side is Side.SELL and reverse_stop_ticks >= request.stop_loss_ticks:
         raise ValueError("short stop-and-reverse stop must be below the initial stop")
     chain_id = request.tags.get(STOP_AND_REVERSE_CHAIN_ID_TAG) or None
-    account_basis = request.tags.get(STOP_AND_REVERSE_ACCOUNT_BASIS_TAG, "equity").lower()
-    if account_basis not in {"balance", "equity"}:
-        raise ValueError("stop-and-reverse account basis must be balance or equity")
     return StopAndReverseInstruction(
         reverse_stop_ticks=reverse_stop_ticks,
         reward_risk=reward_risk,
         chain_id=chain_id,
-        account_basis=account_basis,
     )
 
 

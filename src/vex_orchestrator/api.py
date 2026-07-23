@@ -44,7 +44,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Vex Backtest Engine API",
-        version="1.2.0",
+        version="1.5.0",
         lifespan=lifespan,
     )
     app.add_middleware(
@@ -66,7 +66,7 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         return {
             "status": "ok",
             "service": "vex-backtest-engine",
-            "mode": "candle-by-candle",
+            "mode": "million-candle-streaming",
         }
 
     @app.get("/api/catalog")
@@ -164,6 +164,21 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         limit: int = Query(default=5000, ge=1, le=50000),
     ) -> Any:
         try:
+            job = manager().get(run_id)
+        except LiveRunNotFoundError:
+            job = None
+        if job is not None and not job.state().replay_ready:
+            try:
+                return job.bars_for_view(
+                    symbol,
+                    timeframe,
+                    start_exclusive_ns,
+                    end_inclusive_ns,
+                    limit,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+        try:
             return repository().bars_for_view(
                 run_id,
                 symbol,
@@ -182,6 +197,12 @@ def create_app(project_root: str | Path | None = None) -> FastAPI:
         end_inclusive_ns: int,
         limit: int = Query(default=10000, ge=1, le=100000),
     ) -> Any:
+        try:
+            job = manager().get(run_id)
+        except LiveRunNotFoundError:
+            job = None
+        if job is not None and not job.state().replay_ready:
+            return job.timeline_between(start_exclusive_ns, end_inclusive_ns, limit)
         try:
             return repository().timeline_between(
                 run_id,

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import re
 import shutil
 import threading
@@ -12,9 +13,11 @@ from itertools import islice
 from pathlib import Path
 from typing import Any, Literal, cast
 
+import polars as pl
 from pydantic import JsonValue
 
 from vex_contracts.broker import BrokerSimulationReport
+from vex_contracts.enums import EventType
 from vex_contracts.market import Bar
 from vex_contracts.replay import (
     ReplayBar,
@@ -37,7 +40,7 @@ from vex_orchestrator.models import (
     LiveRunState,
 )
 from vex_orchestrator.pacing import DeadlinePacer, ui_publish_interval
-from vex_replay.builder import ReplayBundleBuilder
+from vex_replay.live_journal import LiveReplayJournal
 from vex_replay.repository import ReplayRunRepository
 from vex_strategy.output import StrategyOutputRecorder
 from vex_strategy.session import StrategyBacktestSession, StrategyStepResult, datetime_to_ns
@@ -53,13 +56,17 @@ class _Subscriber:
 
 
 LIVE_ACCOUNT_TIMELINE_INTERVAL = 250
-LIVE_BOOTSTRAP_BAR_LIMIT = 1_000
-LIVE_BOOTSTRAP_ENTITY_LIMIT = 5_000
-LIVE_BOOTSTRAP_TIMELINE_LIMIT = 5_000
+LIVE_BOOTSTRAP_ENTITY_LIMIT = 2_000
 LIVE_MAX_INCREMENTAL_BARS_PER_FRAME = 1_200
-LIVE_VISUAL_RESET_WINDOW = 1_000
-LIVE_SUBSCRIBER_QUEUE_SIZE = 512
-MAX_LIVE_REPLAY_SPEED = Decimal("100000")
+LIVE_SUBSCRIBER_QUEUE_SIZE = 64
+LIVE_TURBO_SPEED_THRESHOLD = Decimal("2000")
+LIVE_TURBO_COMPACTION_MULTIPLIER = 4
+LIVE_TURBO_WINDOW_REFRESH_SECONDS = 5.0
+MAX_LIVE_REPLAY_SPEED = Decimal("1000000")
+
+
+def _json_identity(payload: dict[str, JsonValue]) -> str:
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 class LiveRunNotFoundError(KeyError):
@@ -97,6 +104,7 @@ class LiveBacktestJob:
         self._thread = threading.Thread(target=self._run_loop, name=f"vex-live-{self.run_id}")
         self._thread.daemon = True
         self._session: StrategyBacktestSession | None = None
+        self._journal: LiveReplayJournal | None = None
         self._status = "created"
         self._playing = not request.start_paused
         self._speed = request.speed_bars_per_second
@@ -106,7 +114,18 @@ class LiveBacktestJob:
         self._seek_time_ns: int | None = None
         self._error: str | None = None
         self._replay_ready = False
-        self._timeline: deque[ReplayTimelineItem] = deque(maxlen=50_000)
+        self.visualization_mode: Literal["replay", "turbo"] = (
+            "turbo"
+            if request.visualization_mode == "turbo"
+            or (
+                request.visualization_mode == "auto"
+                and request.speed_bars_per_second >= LIVE_TURBO_SPEED_THRESHOLD
+            )
+            else "replay"
+        )
+        self._timeline: deque[ReplayTimelineItem] = deque(
+            maxlen=max(request.ui_timeline_limit * 2, 1_000)
+        )
         self._timeline_sequence = 0
         self._created_at = datetime.now(UTC)
         self._updated_at = self._created_at
@@ -115,11 +134,13 @@ class LiveBacktestJob:
         self._processed_execution_bars = 0
         self._last_report = None
         self._pending_bars: list[Bar] = []
+        self._pending_latest_bars: dict[tuple[str, Timeframe], Bar] = {}
         self._pending_bar_reset = False
         self._recent_bars: dict[tuple[str, Timeframe], deque[Bar]] = {}
         self._pending_timeline: list[ReplayTimelineItem] = []
         self._pending_result: StrategyStepResult | None = None
         self._last_publish_monotonic = 0.0
+        self._last_window_refresh_monotonic = 0.0
         self._write_inputs()
         self._replace_session()
 
@@ -220,6 +241,57 @@ class LiveBacktestJob:
         self._validate_view(selected_symbol, selected_timeframe)
         with self._condition:
             return self._bootstrap_unlocked(selected_symbol, selected_timeframe)
+
+    def bars_for_view(
+        self,
+        symbol: str,
+        timeframe: Timeframe,
+        start_exclusive_ns: int,
+        end_inclusive_ns: int,
+        limit: int,
+    ) -> tuple[ReplayBar, ...]:
+        self._validate_view(symbol, timeframe)
+        with self._condition:
+            effective_end = min(end_inclusive_ns, self._current_time_ns)
+        profile = self.profiles[symbol]
+        frame = (
+            self.store.scan(symbol, timeframe, complete_only=True)
+            .filter(
+                (pl.col("close_time_ns") > start_exclusive_ns)
+                & (pl.col("close_time_ns") <= effective_end)
+            )
+            .sort("close_time_ns")
+            .tail(limit)
+            .collect()
+        )
+        return tuple(
+            self._replay_bar_from_row(cast(dict[str, object], row), profile.trade_tick_size)
+            for row in frame.iter_rows(named=True)
+        )
+
+    def timeline_between(
+        self,
+        start_exclusive_ns: int,
+        end_inclusive_ns: int,
+        limit: int,
+    ) -> tuple[ReplayTimelineItem, ...]:
+        committed = self._require_journal().timeline_between(
+            start_exclusive_ns,
+            end_inclusive_ns,
+            limit,
+        )
+        with self._condition:
+            recent = tuple(
+                item
+                for item in self._timeline
+                if start_exclusive_ns < item.time_ns <= end_inclusive_ns
+            )
+        merged: dict[tuple[int, str, str], ReplayTimelineItem] = {}
+        for item in committed + recent:
+            merged[(item.time_ns, item.kind, _json_identity(item.payload))] = item
+        return tuple(
+            sorted(merged.values(), key=lambda item: (item.time_ns, item.sequence))[-limit:]
+        )
 
     async def next_message(self, subscriber: _Subscriber) -> dict[str, Any]:
         return await subscriber.queue.get()
@@ -337,11 +409,15 @@ class LiveBacktestJob:
                     previous_speed = None
             cancel_result = self._require_session().finish("cancelled")
             self._apply_result(cancel_result)
+            self._require_journal().close()
             with self._condition:
                 self._status = "cancelled"
                 self._touch_unlocked()
             self._publish_state()
         except BaseException as exc:
+            journal = self._journal
+            if journal is not None:
+                journal.close()
             session = self._session
             if session is not None and not session.finished:
                 session.terminate()
@@ -393,20 +469,11 @@ class LiveBacktestJob:
             self._playing = False
             self._touch_unlocked()
         self._publish_state()
-        result = ReplayBundleBuilder(
-            project_root=self.project_root,
-            run_config_path=self._relative(self.output_root / "run-config.json"),
-            strategy_descriptor_path=self._relative(self.output_root / "strategy-descriptor.json"),
-            runtime_config_path=self._relative(self.output_root / "runtime-config.json"),
-            symbol_profile_paths=tuple(self._relative(path) for path in self._profile_output_paths),
-            import_report_path=self._relative(self.package.import_report_path),
-            strategy_source_path=self._relative(self._strategy_source_root),
-        ).build(self.request.max_close_batches)
         live_report = self._last_report
         if live_report is None:
             raise RuntimeError("live session completed without a strategy report")
-        if result.strategy_report.deterministic_digest != live_report.deterministic_digest:
-            raise RuntimeError("live and replay-finalization strategy digests do not match")
+        journal = self._require_journal()
+        journal.finalize(live_report, self._require_session().broker)
         self._replay_ready_callback()
         with self._condition:
             self._status = "completed"
@@ -415,6 +482,18 @@ class LiveBacktestJob:
         self._publish_state()
 
     def _replace_session(self) -> None:
+        if self._journal is not None:
+            self._journal.reset()
+        self._journal = LiveReplayJournal(
+            project_root=self.project_root,
+            run=self.run_config,
+            descriptor=self.package.descriptor,
+            runtime=self.package.runtime_config,
+            profiles=tuple(self.package.symbol_profiles),
+            import_report_path=self.package.import_report_path,
+            strategy_source_root=self._strategy_source_root,
+            max_close_batches=self.request.max_close_batches,
+        )
         recorder = StrategyOutputRecorder(self.output_root / "strategy-output")
         self._session = StrategyBacktestSession(
             self.run_config,
@@ -423,6 +502,7 @@ class LiveBacktestJob:
             self.profiles,
             self.store,
             recorder,
+            observer=self._journal.observer,
             strategy_import_paths=(self._strategy_source_root,),
         )
 
@@ -432,6 +512,7 @@ class LiveBacktestJob:
         broadcast: bool = True,
         broadcast_bootstrap: bool = False,
     ) -> None:
+        self._require_journal().record_step(result)
         with self._condition:
             self._current_time_ns = result.event_time_ns
             self._processed_close_batches = result.processed_close_batches
@@ -484,6 +565,8 @@ class LiveBacktestJob:
                 )
             )
         for event in result.broker_events:
+            if event.event_type is EventType.ACCOUNT_UPDATED:
+                continue
             source += 1
             raw.append(
                 (
@@ -541,15 +624,24 @@ class LiveBacktestJob:
     ) -> None:
         now = time.monotonic()
         with self._condition:
-            if not self._pending_bar_reset:
+            if self.visualization_mode == "turbo":
+                for bar in result.bars:
+                    self._pending_latest_bars[(bar.symbol, bar.timeframe)] = bar
+            elif not self._pending_bar_reset:
                 self._pending_bars.extend(result.bars)
                 if len(self._pending_bars) > LIVE_MAX_INCREMENTAL_BARS_PER_FRAME:
                     self._pending_bars.clear()
                     self._pending_bar_reset = True
             self._pending_timeline.extend(items)
+            maximum_pending = self.request.ui_timeline_limit * LIVE_TURBO_COMPACTION_MULTIPLIER
+            if len(self._pending_timeline) > maximum_pending:
+                self._pending_timeline[:] = self._compact_timeline(
+                    self._pending_timeline,
+                    self.request.ui_timeline_limit,
+                )
             self._pending_result = result
             force = result.completed or not self._playing
-            due = now - self._last_publish_monotonic >= ui_publish_interval(float(self._speed))
+            due = now - self._last_publish_monotonic >= self._publish_interval_unlocked()
         if force or due:
             self._flush_pending_publish(now)
 
@@ -558,10 +650,40 @@ class LiveBacktestJob:
             result = self._pending_result
             if result is None:
                 return
-            bars = self._deduplicate_pending_bars(self._pending_bars)
-            bar_reset = self._pending_bar_reset
-            items = tuple(self._pending_timeline)
+            if self.visualization_mode == "turbo":
+                publish_time = time.monotonic() if now is None else now
+                bar_reset = (
+                    result.completed
+                    or publish_time - self._last_window_refresh_monotonic
+                    >= LIVE_TURBO_WINDOW_REFRESH_SECONDS
+                )
+                if bar_reset:
+                    bars = ()
+                    self._last_window_refresh_monotonic = publish_time
+                else:
+                    bars = tuple(
+                        sorted(
+                            self._pending_latest_bars.values(),
+                            key=lambda bar: (
+                                bar.close_time_ns,
+                                bar.symbol,
+                                bar.timeframe.value,
+                                bar.sequence,
+                            ),
+                        )
+                    )
+                items = tuple(
+                    self._compact_timeline(
+                        self._pending_timeline,
+                        self.request.ui_timeline_limit,
+                    )
+                )
+            else:
+                bars = self._deduplicate_pending_bars(self._pending_bars)
+                bar_reset = self._pending_bar_reset
+                items = tuple(self._pending_timeline[-self.request.ui_timeline_limit :])
             self._pending_bars.clear()
+            self._pending_latest_bars.clear()
             self._pending_bar_reset = False
             self._pending_timeline.clear()
             self._pending_result = None
@@ -609,22 +731,66 @@ class LiveBacktestJob:
     def _clear_pending_publish(self) -> None:
         with self._condition:
             self._pending_bars.clear()
+            self._pending_latest_bars.clear()
             self._pending_bar_reset = False
             self._pending_timeline.clear()
             self._pending_result = None
             self._last_publish_monotonic = time.monotonic()
+            self._last_window_refresh_monotonic = 0.0
 
     def _remember_recent_bars(self, bars: tuple[Bar, ...]) -> None:
         for bar in bars:
             key = (bar.symbol, bar.timeframe)
             recent = self._recent_bars.get(key)
             if recent is None:
-                recent = deque(maxlen=LIVE_VISUAL_RESET_WINDOW)
+                recent = deque(maxlen=self.request.ui_window_bars)
                 self._recent_bars[key] = recent
             if recent and recent[-1].sequence == bar.sequence:
                 recent[-1] = bar
             elif not recent or recent[-1].sequence < bar.sequence:
                 recent.append(bar)
+
+
+    def _publish_interval_unlocked(self) -> float:
+        if self.visualization_mode == "turbo":
+            return self.request.ui_snapshot_interval_ms / 1000.0
+        return ui_publish_interval(float(self._speed))
+
+    @staticmethod
+    def _compact_timeline(
+        items: list[ReplayTimelineItem],
+        limit: int,
+    ) -> list[ReplayTimelineItem]:
+        if len(items) <= limit:
+            return list(items)
+        latest_chart: dict[str, ReplayTimelineItem] = {}
+        important: list[ReplayTimelineItem] = []
+        latest_account: ReplayTimelineItem | None = None
+        for item in items:
+            if item.kind == "account_snapshot":
+                latest_account = item
+                continue
+            if item.kind == "chart_command":
+                payload = item.payload
+                command_type = str(payload.get("command_type", ""))
+                if command_type == "upsert_drawing":
+                    drawing = payload.get("drawing")
+                    if isinstance(drawing, dict):
+                        drawing_id = str(drawing.get("drawing_id", ""))
+                        if drawing_id:
+                            latest_chart[f"drawing:{drawing_id}"] = item
+                            continue
+                if command_type == "append_series_point":
+                    series_id = str(payload.get("series_id", ""))
+                    if series_id:
+                        latest_chart[f"series:{series_id}"] = item
+                        continue
+            important.append(item)
+        compacted = important + list(latest_chart.values())
+        if latest_account is not None:
+            compacted.append(latest_account)
+        compacted.sort(key=lambda item: item.sequence)
+        return compacted[-limit:]
 
     @staticmethod
     def _deduplicate_pending_bars(bars: list[Bar]) -> tuple[Bar, ...]:
@@ -688,14 +854,6 @@ class LiveBacktestJob:
                     except asyncio.QueueEmpty:
                         break
                 subscriber.dropped_messages += dropped
-                subscriber.queue.put_nowait(
-                    {
-                        "type": "resync_required",
-                        "detail": "subscriber queue overflowed; reconnect for a fresh bootstrap",
-                        "dropped_messages": subscriber.dropped_messages,
-                    }
-                )
-                return
             subscriber.queue.put_nowait(message)
 
         subscriber.loop.call_soon_threadsafe(put)
@@ -707,13 +865,13 @@ class LiveBacktestJob:
             symbol,
             timeframe,
             self._current_time_ns,
-            LIVE_BOOTSTRAP_BAR_LIMIT,
+            self.request.ui_window_bars,
         )
         bars = tuple(
             self._replay_bar_from_row(cast(dict[str, object], row), profile.trade_tick_size)
             for row in frame.iter_rows(named=True)
         )
-        report = self._last_report or session.snapshot_report()
+        report = self._last_report or session.live_snapshot_report()
         broker = session.broker
         return ReplayBootstrap(
             run=self._descriptor_unlocked(),
@@ -728,22 +886,22 @@ class LiveBacktestJob:
             timeline=tuple(
                 islice(
                     self._timeline,
-                    max(0, len(self._timeline) - LIVE_BOOTSTRAP_TIMELINE_LIMIT),
+                    max(0, len(self._timeline) - self.request.ui_timeline_limit),
                     None,
                 )
             ),
             account=broker.state_snapshot.account,
-            orders=broker.orders[-LIVE_BOOTSTRAP_ENTITY_LIMIT:],
+            orders=broker.recent_orders(LIVE_BOOTSTRAP_ENTITY_LIMIT),
             positions=broker.open_positions,
-            fills=broker.fills[-LIVE_BOOTSTRAP_ENTITY_LIMIT:],
-            trades=broker.trades[-LIVE_BOOTSTRAP_ENTITY_LIMIT:],
+            fills=broker.recent_fills(LIVE_BOOTSTRAP_ENTITY_LIMIT),
+            trades=broker.recent_trades(LIVE_BOOTSTRAP_ENTITY_LIMIT),
             strategy_report=report,
             broker_report=report.broker_report,
         )
 
     def _descriptor_unlocked(self) -> ReplayRunDescriptor:
         session = self._require_session()
-        report = self._last_report or session.snapshot_report()
+        report = self._last_report or session.live_snapshot_report()
         available = self.store.available()
         symbols = tuple(sorted({symbol for symbol, _ in available}))
         timeframes = tuple(
@@ -788,6 +946,7 @@ class LiveBacktestJob:
             ),
             playing=self._playing and self._status == "running",
             speed_bars_per_second=self._speed,
+            visualization_mode=self.visualization_mode,
             processed_close_batches=self._processed_close_batches,
             processed_execution_bars=self._processed_execution_bars,
             current_time_ns=self._current_time_ns,
@@ -816,15 +975,8 @@ class LiveBacktestJob:
         return min(Decimal("1"), max(time_progress, batch_progress))
 
     def _metrics(self, report: BrokerSimulationReport) -> ReplayMetrics:
-        trades = self._require_session().broker.trades
-        wins = tuple(trade for trade in trades if trade.net_pnl > 0)
-        losses = tuple(trade for trade in trades if trade.net_pnl < 0)
-        gross_profit = sum((trade.net_pnl for trade in wins), start=Decimal("0"))
-        gross_loss = -sum((trade.net_pnl for trade in losses), start=Decimal("0"))
-        total = len(trades)
-        r_values = tuple(
-            trade.realized_r_multiple for trade in trades if trade.realized_r_multiple is not None
-        )
+        statistics = self._require_session().broker.aggregate_statistics
+        total = statistics.trade_count
         return ReplayMetrics(
             initial_balance=self.run_config.account.initial_balance,
             final_balance=report.final_account.balance,
@@ -836,17 +988,27 @@ class LiveBacktestJob:
             slippage_cost=report.slippage_cost,
             swap=report.swap,
             total_trades=total,
-            winning_trades=len(wins),
-            losing_trades=len(losses),
-            long_trades=sum(trade.side.value == "long" for trade in trades),
-            short_trades=sum(trade.side.value == "short" for trade in trades),
-            win_rate=Decimal(len(wins) * 100) / total if total else Decimal("0"),
-            profit_factor=gross_profit / gross_loss if gross_loss > 0 else None,
-            average_r_multiple=(
-                sum(r_values, start=Decimal("0")) / len(r_values) if r_values else None
+            winning_trades=statistics.winning_trades,
+            losing_trades=statistics.losing_trades,
+            long_trades=statistics.long_trades,
+            short_trades=statistics.short_trades,
+            win_rate=(
+                Decimal(statistics.winning_trades * 100) / total
+                if total
+                else Decimal("0")
             ),
-            max_drawdown_amount=report.final_account.drawdown_amount,
-            max_drawdown_percent=report.final_account.drawdown_percent,
+            profit_factor=(
+                statistics.gross_profit / statistics.gross_loss
+                if statistics.gross_loss > 0
+                else None
+            ),
+            average_r_multiple=(
+                statistics.realized_r_sum / statistics.realized_r_count
+                if statistics.realized_r_count
+                else None
+            ),
+            max_drawdown_amount=self._require_session().broker.max_drawdown_amount,
+            max_drawdown_percent=self._require_session().broker.max_drawdown_percent,
         )
 
     def _replay_bar(self, bar: Bar) -> ReplayBar:
@@ -912,6 +1074,11 @@ class LiveBacktestJob:
 
     def _touch_unlocked(self) -> None:
         self._updated_at = datetime.now(UTC)
+
+    def _require_journal(self) -> LiveReplayJournal:
+        if self._journal is None:
+            raise RuntimeError("live replay journal is not initialized")
+        return self._journal
 
     def _require_session(self) -> StrategyBacktestSession:
         if self._session is None:

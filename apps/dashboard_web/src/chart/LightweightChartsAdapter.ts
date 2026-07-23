@@ -14,12 +14,7 @@ import {
 } from "lightweight-charts";
 import type { ReplayBar } from "../lib/types";
 import { timeNsToSeconds } from "../lib/format";
-import type {
-  ChartAdapter,
-  ChartCoordinates,
-  ChartRenderReason,
-  VisibleTimeRangeNs
-} from "./ChartAdapter";
+import type { ChartAdapter, ChartCoordinates, VisibleTimeRangeNs } from "./ChartAdapter";
 import type { MaterializedChartState } from "./chartState";
 import {
   latestLogicalRange,
@@ -32,7 +27,6 @@ interface LineSeriesState {
   count: number;
   firstTimeNs: number | null;
   lastTimeNs: number | null;
-  lastValue: number | null;
   signature: string;
 }
 
@@ -42,15 +36,12 @@ export class LightweightChartsAdapter implements ChartAdapter {
   private readonly lineSeries = new Map<string, ISeriesApi<"Line">>();
   private readonly lineStates = new Map<string, LineSeriesState>();
   private resizeObserver: ResizeObserver | null = null;
-  private readonly renderHandlers = new Set<(reason: ChartRenderReason) => void>();
+  private readonly renderHandlers = new Set<() => void>();
   private renderFrame: number | null = null;
-  private pendingRenderReason: ChartRenderReason = "data";
   private barCount = 0;
   private lastBarTime: UTCTimestamp | null = null;
   private priceViewportSignature = "";
   private timeViewportSignature = "";
-  private activeViewport: ChartViewportSettings | null = null;
-  private suppressViewportRenderUntil = 0;
 
   mount(container: HTMLElement): void {
     this.destroy();
@@ -141,13 +132,10 @@ export class LightweightChartsAdapter implements ChartAdapter {
       conflationThresholdFactor: 1
     });
 
-    const notifyViewport = () => this.queueRender(
-      performance.now() < this.suppressViewportRenderUntil ? "data" : "viewport"
-    );
-    const notifyResize = () => this.queueRender("resize");
-    this.chart.timeScale().subscribeVisibleLogicalRangeChange(notifyViewport);
-    this.chart.timeScale().subscribeSizeChange(notifyResize);
-    this.resizeObserver = new ResizeObserver(notifyResize);
+    const notify = () => this.queueRender();
+    this.chart.timeScale().subscribeVisibleLogicalRangeChange(notify);
+    this.chart.timeScale().subscribeSizeChange(notify);
+    this.resizeObserver = new ResizeObserver(notify);
     this.resizeObserver.observe(container);
   }
 
@@ -165,9 +153,6 @@ export class LightweightChartsAdapter implements ChartAdapter {
     this.lastBarTime = null;
     this.priceViewportSignature = "";
     this.timeViewportSignature = "";
-    this.activeViewport = null;
-    this.pendingRenderReason = "data";
-    this.suppressViewportRenderUntil = 0;
   }
 
   setBars(bars: ReplayBar[]): void {
@@ -175,8 +160,8 @@ export class LightweightChartsAdapter implements ChartAdapter {
     this.candles?.setData(data);
     this.barCount = data.length;
     this.lastBarTime = data.at(-1)?.time ?? null;
-    this.restoreFollowLatestRange();
-    this.queueRender("data");
+    this.timeViewportSignature = "";
+    this.queueRender();
   }
 
   updateBars(bars: ReplayBar[]): void {
@@ -192,8 +177,7 @@ export class LightweightChartsAdapter implements ChartAdapter {
       }
       this.lastBarTime = candle.time as UTCTimestamp;
     }
-    this.maintainFollowLatest();
-    this.queueRender("data");
+    this.queueRender();
   }
 
   setStrategyState(state: MaterializedChartState, tickSize: number): void {
@@ -231,9 +215,7 @@ export class LightweightChartsAdapter implements ChartAdapter {
 
       const points = state.points.get(definition.seriesId) ?? [];
       const firstTimeNs = points[0]?.timeNs ?? null;
-      const lastPoint = points.at(-1) ?? null;
-      const lastTimeNs = lastPoint?.timeNs ?? null;
-      const lastValue = lastPoint?.value ?? null;
+      const lastTimeNs = points.at(-1)?.timeNs ?? null;
       const requiresReplace =
         !previous ||
         points.length < previous.count ||
@@ -248,21 +230,12 @@ export class LightweightChartsAdapter implements ChartAdapter {
           if (!point || !Number.isFinite(point.timeNs) || !Number.isFinite(point.value)) continue;
           series.update(toLineData(point.timeNs, point.value, tickSize));
         }
-        if (
-          points.length === previous.count &&
-          lastPoint &&
-          lastTimeNs === previous.lastTimeNs &&
-          lastValue !== previous.lastValue
-        ) {
-          series.update(toLineData(lastPoint.timeNs, lastPoint.value, tickSize));
-        }
       }
 
       this.lineStates.set(definition.seriesId, {
         count: points.length,
         firstTimeNs,
         lastTimeNs,
-        lastValue,
         signature
       });
     }
@@ -273,11 +246,10 @@ export class LightweightChartsAdapter implements ChartAdapter {
       this.lineSeries.delete(seriesId);
       this.lineStates.delete(seriesId);
     }
-    this.queueRender("strategy");
+    this.queueRender();
   }
 
   applyViewport(settings: ChartViewportSettings): void {
-    this.activeViewport = settings;
     const priceScale = this.candles?.priceScale();
     const priceSignature = settings.priceScaleMode === "locked" && settings.priceRange
       ? `locked:${settings.priceRange.from}:${settings.priceRange.to}`
@@ -303,7 +275,7 @@ export class LightweightChartsAdapter implements ChartAdapter {
         if (range) this.chart?.timeScale().setVisibleLogicalRange(range);
       }
     }
-    this.queueRender("viewport");
+    this.queueRender();
   }
 
   capturePriceRange(): PriceRange | null {
@@ -325,29 +297,16 @@ export class LightweightChartsAdapter implements ChartAdapter {
 
   visibleTimeRangeNs(): VisibleTimeRangeNs | null {
     const range = this.chart?.timeScale().getVisibleRange();
-    if (!range) return null;
-    const from = Number(range.from) * 1_000_000_000;
-    const to = Number(range.to) * 1_000_000_000;
-    if (!Number.isFinite(from) || !Number.isFinite(to)) return null;
-    return { from: Math.min(from, to), to: Math.max(from, to) };
-  }
-
-  setVisibleTimeRangeNs(range: VisibleTimeRangeNs): void {
-    if (!this.chart || !Number.isFinite(range.from) || !Number.isFinite(range.to)) return;
-    const from = Math.min(range.from, range.to);
-    const to = Math.max(range.from, range.to);
-    if (to <= from) return;
-    this.suppressViewportRenderUntil = performance.now() + 120;
-    this.chart.timeScale().setVisibleRange({
-      from: timeNsToSeconds(from) as UTCTimestamp,
-      to: timeNsToSeconds(to) as UTCTimestamp
-    });
-    this.queueRender("viewport");
+    if (!range || typeof range.from !== "number" || typeof range.to !== "number") return null;
+    return {
+      fromNs: Number(range.from) * 1_000_000_000,
+      toNs: Number(range.to) * 1_000_000_000
+    };
   }
 
   fitContent(): void {
     this.chart?.timeScale().fitContent();
-    this.queueRender("viewport");
+    this.queueRender();
   }
 
   coordinates(): ChartCoordinates {
@@ -358,49 +317,18 @@ export class LightweightChartsAdapter implements ChartAdapter {
     };
   }
 
-  subscribeRender(handler: (reason: ChartRenderReason) => void): () => void {
+  subscribeRender(handler: () => void): () => void {
     this.renderHandlers.add(handler);
     return () => this.renderHandlers.delete(handler);
   }
 
-  private restoreFollowLatestRange(): void {
-    const settings = this.activeViewport;
-    if (!settings?.followLatest || !this.chart) return;
-    const range = latestLogicalRange(this.barCount, settings);
-    if (!range) return;
-    this.suppressViewportRenderUntil = performance.now() + 120;
-    this.chart.timeScale().setVisibleLogicalRange(range);
-  }
-
-  private maintainFollowLatest(): void {
-    const settings = this.activeViewport;
-    if (!settings?.followLatest || !this.chart) return;
-    const range = this.chart.timeScale().getVisibleLogicalRange();
-    const expectedRight = this.barCount - 1 + settings.rightOffset;
-    if (range && Math.abs(range.to - expectedRight) <= 0.5) return;
-    this.suppressViewportRenderUntil = performance.now() + 120;
-    this.chart.timeScale().scrollToPosition(settings.rightOffset, false);
-  }
-
-  private queueRender(reason: ChartRenderReason): void {
-    if (renderReasonPriority(reason) > renderReasonPriority(this.pendingRenderReason)) {
-      this.pendingRenderReason = reason;
-    }
+  private queueRender(): void {
     if (this.renderFrame !== null) return;
     this.renderFrame = requestAnimationFrame(() => {
       this.renderFrame = null;
-      const pending = this.pendingRenderReason;
-      this.pendingRenderReason = "data";
-      for (const handler of this.renderHandlers) handler(pending);
+      for (const handler of this.renderHandlers) handler();
     });
   }
-}
-
-function renderReasonPriority(reason: ChartRenderReason): number {
-  if (reason === "resize") return 4;
-  if (reason === "viewport") return 3;
-  if (reason === "strategy") return 2;
-  return 1;
 }
 
 function normalizeCandleData(bars: ReplayBar[]): CandlestickData<UTCTimestamp>[] {

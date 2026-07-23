@@ -462,6 +462,15 @@
       "format": "date-time",
       "title": "Updated At",
       "type": "string"
+    },
+    "visualization_mode": {
+      "default": "replay",
+      "enum": [
+        "replay",
+        "turbo"
+      ],
+      "title": "Visualization Mode",
+      "type": "string"
     }
   },
   "required": [

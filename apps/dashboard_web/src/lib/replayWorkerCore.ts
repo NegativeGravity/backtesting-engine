@@ -6,8 +6,8 @@ export interface ReplayMergeLimits {
 }
 
 export const DEFAULT_REPLAY_MERGE_LIMITS: ReplayMergeLimits = {
-  maxBars: 12_000,
-  maxTimelineItems: 20_000
+  maxBars: 2_400,
+  maxTimelineItems: 2_000
 };
 
 export function mergeAdvanceFramesFast(

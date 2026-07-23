@@ -363,7 +363,7 @@ class ReplayRunRepository:
         self,
         run_id: str,
         end_inclusive_ns: int,
-        limit: int = 50000,
+        limit: int = 10000,
     ) -> tuple[ReplayTimelineItem, ...]:
         context = self._context(run_id)
         connection = self._connection(context)
@@ -383,6 +383,41 @@ class ReplayRunRepository:
             )
             for sequence, time_ns, kind, payload in rows
         )
+
+    def timeline_for_window(
+        self,
+        run_id: str,
+        start_exclusive_ns: int,
+        end_inclusive_ns: int,
+        limit: int = 10_000,
+    ) -> tuple[ReplayTimelineItem, ...]:
+        window = list(
+            self.timeline_between(
+                run_id,
+                start_exclusive_ns,
+                end_inclusive_ns,
+                limit,
+            )
+        )
+        seed = self.timeline_until(run_id, start_exclusive_ns, limit=2_000)
+        latest_series: dict[str, ReplayTimelineItem] = {}
+        for item in seed:
+            if item.kind != "chart_command":
+                continue
+            command_type = str(item.payload.get("command_type", ""))
+            if command_type == "declare_series":
+                series = item.payload.get("series")
+                if isinstance(series, dict):
+                    series_id = str(series.get("series_id", ""))
+                    if series_id:
+                        latest_series[f"declare:{series_id}"] = item
+            elif command_type == "set_series_visibility":
+                series_id = str(item.payload.get("series_id", ""))
+                if series_id:
+                    latest_series[f"visibility:{series_id}"] = item
+        merged = list(latest_series.values()) + window
+        merged.sort(key=lambda item: item.sequence)
+        return tuple(merged[-limit:])
 
     def account_at(self, run_id: str, time_ns: int) -> AccountSnapshot:
         context = self._context(run_id)
@@ -523,7 +558,8 @@ class ReplayRunRepository:
         )
         cursor = execution.close_time_ns
         bars = self.history(run_id, selected_symbol, selected_timeframe, cursor, history_count)
-        timeline = self.timeline_until(run_id, cursor)
+        window_start_ns = bars[0].open_time_ns - 1 if bars else context.manifest.start_time_ns - 1
+        timeline = self.timeline_for_window(run_id, window_start_ns, cursor, limit=10_000)
         orders, positions, fills, trades = self.state_at(
             run_id,
             cursor,

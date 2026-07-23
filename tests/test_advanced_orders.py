@@ -4,14 +4,12 @@ from pathlib import Path
 from vex_broker.advanced_orders import (
     ENTRY_REEVALUATE_AFTER_FLAT_TAG,
     ENTRY_REQUIRE_FLAT_TAG,
-    EXECUTION_ACCOUNT_BASIS_TAG,
     EXECUTION_REWARD_RISK_TAG,
     EXECUTION_RISK_REWARD_ENABLED_TAG,
     INTRABAR_ENTRY_TARGET_ALLOWED_TAG,
     OCO_AMBIGUOUS_POLICY_TAG,
     OCO_GROUP_TAG,
     OCO_POLICY_CANCEL_ALL,
-    STOP_AND_REVERSE_ACCOUNT_BASIS_TAG,
     STOP_AND_REVERSE_CHAIN_ID_TAG,
     STOP_AND_REVERSE_ENABLED_TAG,
     STOP_AND_REVERSE_REWARD_RISK_TAG,
@@ -68,10 +66,6 @@ def make_breakout_order(
     target_ticks: int,
     reverse_stop_ticks: int,
     group: str = "yj-test-group",
-    chain_id: str = "test-chain",
-    trade_date: str = "2025-01-03",
-    require_flat: bool = True,
-    created_time_ns: int = 0,
 ) -> OrderRequest:
     return OrderRequest(
         client_order_id=client_order_id,
@@ -81,7 +75,7 @@ def make_breakout_order(
         side=side,
         order_type=OrderType.STOP,
         volume_lots=Decimal("5"),
-        created_time_ns=created_time_ns,
+        created_time_ns=0,
         price_ticks=trigger_ticks,
         stop_loss_ticks=stop_ticks,
         take_profit_ticks=target_ticks,
@@ -89,28 +83,17 @@ def make_breakout_order(
         expiration_time_ns=86_400 * NS,
         tags={
             "strategy": "yj_box_breakout",
-            "chain_id": chain_id,
-            "trade_date": trade_date,
-            "leg": "1",
             OCO_GROUP_TAG: group,
             OCO_AMBIGUOUS_POLICY_TAG: OCO_POLICY_CANCEL_ALL,
             EXECUTION_RISK_REWARD_ENABLED_TAG: "true",
             EXECUTION_REWARD_RISK_TAG: "1.5",
-            EXECUTION_ACCOUNT_BASIS_TAG: "balance",
-            **(
-                {
-                    ENTRY_REQUIRE_FLAT_TAG: "true",
-                    ENTRY_REEVALUATE_AFTER_FLAT_TAG: "true",
-                }
-                if require_flat
-                else {}
-            ),
+            ENTRY_REQUIRE_FLAT_TAG: "true",
+            ENTRY_REEVALUATE_AFTER_FLAT_TAG: "true",
             INTRABAR_ENTRY_TARGET_ALLOWED_TAG: "true",
             STOP_AND_REVERSE_ENABLED_TAG: "true",
             STOP_AND_REVERSE_STOP_TICKS_TAG: str(reverse_stop_ticks),
             STOP_AND_REVERSE_REWARD_RISK_TAG: "1.5",
-            STOP_AND_REVERSE_CHAIN_ID_TAG: chain_id,
-            STOP_AND_REVERSE_ACCOUNT_BASIS_TAG: "balance",
+            STOP_AND_REVERSE_CHAIN_ID_TAG: "test-chain",
         },
     )
 
@@ -410,113 +393,3 @@ def test_conservative_stop_priority_and_no_third_leg(project_root: Path) -> None
         if order.request.tags.get("broker_generated") == "stop_and_reverse"
     ]
     assert len(generated) == 1
-
-
-def test_parallel_daily_chains_open_together_and_keep_protections_isolated(
-    project_root: Path,
-) -> None:
-    instance, run = broker(project_root)
-
-    instance.submit_order(
-        make_breakout_order(
-            run,
-            client_order_id="day-a-long",
-            side=Side.BUY,
-            trigger_ticks=1100,
-            stop_ticks=900,
-            target_ticks=1400,
-            reverse_stop_ticks=1100,
-            group="day-a",
-            chain_id="2025-02-24-0001",
-            trade_date="2025-02-24",
-            require_flat=False,
-        )
-    )
-    instance.submit_order(
-        make_breakout_order(
-            run,
-            client_order_id="day-a-short",
-            side=Side.SELL,
-            trigger_ticks=900,
-            stop_ticks=1100,
-            target_ticks=600,
-            reverse_stop_ticks=900,
-            group="day-a",
-            chain_id="2025-02-24-0001",
-            trade_date="2025-02-24",
-            require_flat=False,
-        )
-    )
-
-    first = instance.process_bar(make_bar(1, 1120, 1140, 1000, 1100))
-    assert len(first.positions) == 1
-    day_a = first.positions[0]
-    assert day_a.entry_tags["chain_id"] == "2025-02-24-0001"
-    assert day_a.stop_loss_ticks == 900
-
-    instance.submit_order(
-        make_breakout_order(
-            run,
-            client_order_id="day-b-long",
-            side=Side.BUY,
-            trigger_ticks=1200,
-            stop_ticks=1000,
-            target_ticks=1500,
-            reverse_stop_ticks=1200,
-            group="day-b",
-            chain_id="2025-02-25-0002",
-            trade_date="2025-02-25",
-            require_flat=False,
-            created_time_ns=first.account_snapshot.timestamp_ns,
-        )
-    )
-    instance.submit_order(
-        make_breakout_order(
-            run,
-            client_order_id="day-b-short",
-            side=Side.SELL,
-            trigger_ticks=1000,
-            stop_ticks=1200,
-            target_ticks=700,
-            reverse_stop_ticks=1000,
-            group="day-b",
-            chain_id="2025-02-25-0002",
-            trade_date="2025-02-25",
-            require_flat=False,
-            created_time_ns=first.account_snapshot.timestamp_ns,
-        )
-    )
-
-    second = instance.process_bar(make_bar(2, 1080, 1090, 990, 1020))
-    assert len(second.positions) == 2
-    by_chain = {position.entry_tags["chain_id"]: position for position in second.positions}
-    assert by_chain["2025-02-24-0001"].side is PositionSide.LONG
-    assert by_chain["2025-02-24-0001"].stop_loss_ticks == 900
-    assert by_chain["2025-02-25-0002"].side is PositionSide.SHORT
-    assert by_chain["2025-02-25-0002"].stop_loss_ticks == 1200
-
-    third = instance.process_bar(make_bar(3, 1080, 1210, 950, 1100))
-
-    assert len(third.trades) == 1
-    stopped = third.trades[0]
-    assert stopped.entry_tags["chain_id"] == "2025-02-25-0002"
-    assert stopped.entry_tags["trade_date"] == "2025-02-25"
-    assert stopped.stop_loss_ticks == 1200
-    assert stopped.exit_reason == "stop_loss"
-
-    assert len(third.positions) == 2
-    remaining_by_chain = {
-        position.entry_tags["chain_id"]: position
-        for position in third.positions
-    }
-    original = remaining_by_chain["2025-02-24-0001"]
-    reversal = remaining_by_chain["2025-02-25-0002"]
-    assert original.side is PositionSide.LONG
-    assert original.stop_loss_ticks == 900
-    assert original.take_profit_ticks == 1450
-    assert reversal.side is PositionSide.LONG
-    assert reversal.entry_tags["leg"] == "2"
-    assert reversal.entry_tags["trade_date"] == "2025-02-25"
-    assert reversal.stop_loss_ticks == 1000
-    assert reversal.take_profit_ticks == 1500
-    assert original.position_id != reversal.position_id

@@ -10,6 +10,26 @@ from vex_contracts.positions import AccountSnapshot, Position, Trade
 ZERO = Decimal("0")
 
 
+
+
+@dataclass(frozen=True, slots=True)
+class BrokerAggregateStatistics:
+    commission: Decimal = ZERO
+    spread_cost: Decimal = ZERO
+    slippage_cost: Decimal = ZERO
+    realized_swap: Decimal = ZERO
+    gross_profit: Decimal = ZERO
+    gross_loss: Decimal = ZERO
+    realized_r_sum: Decimal = ZERO
+    realized_r_count: int = 0
+    trade_count: int = 0
+    winning_trades: int = 0
+    losing_trades: int = 0
+    long_trades: int = 0
+    short_trades: int = 0
+    rejected_orders: int = 0
+    cancelled_orders: int = 0
+
 @dataclass(slots=True)
 class PositionState:
     position_id: str
@@ -21,10 +41,8 @@ class PositionState:
     average_entry_price_ticks: Decimal
     opened_time_ns: int
     entry_order_id: str
-    entry_client_order_id: str
-    entry_tags: dict[str, str] = field(default_factory=dict)
-    stop_loss_ticks: int | None = None
-    take_profit_ticks: int | None = None
+    stop_loss_ticks: int | None
+    take_profit_ticks: int | None
     stop_order_id: str | None = None
     take_profit_order_id: str | None = None
     entry_commission: Decimal = ZERO

@@ -14,6 +14,7 @@ export function LiveBacktestLauncher({ onRunCreated }: Props) {
   const [maxBatches, setMaxBatches] = useState(5000);
   const [speed, setSpeed] = useState(10);
   const [startPaused, setStartPaused] = useState(true);
+  const [visualizationMode, setVisualizationMode] = useState<"auto" | "replay" | "turbo">("auto");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +60,10 @@ export function LiveBacktestLauncher({ onRunCreated }: Props) {
         strategy_package_id: strategyId,
         start_paused: startPaused,
         speed_bars_per_second: speed,
+        visualization_mode: visualizationMode,
+        ui_snapshot_interval_ms: visualizationMode === "replay" ? 100 : 500,
+        ui_window_bars: 2400,
+        ui_timeline_limit: 2000,
         ...(runUntilEnd ? {} : { max_close_batches: maxBatches })
       });
       onRunCreated(run.run_id);
@@ -76,7 +81,7 @@ export function LiveBacktestLauncher({ onRunCreated }: Props) {
           <div>
             <span>Long-running engine</span>
             <h1>Candle-by-candle strategy backtest</h1>
-            <p>The engine stays online. Strategy packages are discovered from the mounted strategies directory and each closed candle is delivered to an isolated strategy process.</p>
+            <p>The engine stays online. Strategy packages are discovered from the mounted strategies directory and each closed candle is processed deterministically while the dashboard receives a bounded, coalesced visualization stream.</p>
           </div>
           <button className="secondary-action" onClick={() => void refresh()} disabled={busy}><RefreshCw size={15} /> Refresh strategies</button>
         </div>
@@ -84,7 +89,8 @@ export function LiveBacktestLauncher({ onRunCreated }: Props) {
           <label className="live-field"><span>Strategy package</span><select value={strategyId} onChange={event => setStrategyId(event.target.value)}>{catalog?.strategies.map(item => <option key={item.package_id} value={item.package_id}>{item.name} · {item.version}</option>)}</select></label>
           <label className="live-check"><input type="checkbox" checked={runUntilEnd} onChange={event => setRunUntilEnd(event.target.checked)} /><span>Run until end of available data</span></label>
           <label className="live-field"><span>Maximum close batches</span><input type="number" min="1" value={maxBatches} disabled={runUntilEnd} onChange={event => { const value = Number(event.target.value); if (Number.isFinite(value)) setMaxBatches(Math.max(1, Math.trunc(value))); }} /></label>
-          <label className="live-field"><span>Bars per second</span><input type="number" min="1" max="100000" value={speed} onChange={event => setSpeed(Math.min(100000, Math.max(1, Number(event.target.value))))} /></label>
+          <label className="live-field"><span>Bars per second</span><input type="number" min="1" max="1000000" value={speed} onChange={event => setSpeed(Math.min(1000000, Math.max(1, Number(event.target.value))))} /></label>
+          <label className="live-field"><span>Dashboard stream</span><select value={visualizationMode} onChange={event => setVisualizationMode(event.target.value as "auto" | "replay" | "turbo")}><option value="auto">Auto · Turbo for high speed</option><option value="turbo">Turbo · million-candle mode</option><option value="replay">Replay · every visible update</option></select></label>
           <label className="live-check"><input type="checkbox" checked={startPaused} onChange={event => setStartPaused(event.target.checked)} /><span>Start paused for manual candle stepping</span></label>
         </div>
         {selected ? <div className="strategy-summary"><strong>{selected.name}</strong><span>{selected.description}</span><code>{selected.entrypoint}</code></div> : null}

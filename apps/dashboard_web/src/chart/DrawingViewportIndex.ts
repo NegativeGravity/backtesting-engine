@@ -87,10 +87,10 @@ export class DrawingViewportIndex {
     }
 
     if (range) {
-      const span = Math.max(1, range.to - range.from);
+      const span = Math.max(1, range.toNs - range.fromNs);
       const margin = span * DRAWING_VIEWPORT_MARGIN_RATIO;
-      const fromBucket = bucketFor(range.from - margin);
-      const toBucket = bucketFor(range.to + margin);
+      const fromBucket = bucketFor(range.fromNs - margin);
+      const toBucket = bucketFor(range.toNs + margin);
       for (let bucket = fromBucket; bucket <= toBucket; bucket += 1) {
         const entries = this.buckets.get(bucket);
         if (!entries) continue;
@@ -151,7 +151,7 @@ function isDynamicDrawing(state: DrawingState): boolean {
   const drawing = state.payload;
   const kind = String(drawing.kind ?? "");
   if (kind !== "broker_trade" && kind !== "risk_reward") return false;
-  return finiteNullableNumber(drawing.exit_time_ns) === null;
+  return String(drawing.status ?? "") === "open";
 }
 
 function pointPairBounds(startValue: unknown, endValue: unknown): DrawingTimeBounds | null {
